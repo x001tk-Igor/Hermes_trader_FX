@@ -1,0 +1,28 @@
+# Self-heal: recreate the XAU-trader durable crons (machine TZ = UTC)
+# Use if CronList shows them missing or near 7-day expiry. All durable:true, recurring.
+#
+# Multi-instrument: cycle scans XAUUSD/EURUSD/USDJPY/USDCAD/GBPJPY
+# cycle  (06:01-21:46 UTC):   cron "1,16,31,46 6-21 * * 1-5"  -- runs 1 min AFTER M15 bar close
+# pre-market (05:50 UTC):     cron "50 5 * * 1-5"
+# daily report (22:33 UTC):   cron "33 22 * * 1-5"
+#
+# CronCreate each with durable=true, recurring=true, and the prompts stored in this
+# session's SKILL.md "Каданс". Recurring auto-expires after 7 days — recreate weekly.
+
+# === cycle prompt ===
+Автономный цикл мульти-инструментного трейдера (счёт из .env, 5 инструментов).
+СНАЧАЛА resume-шаг 0: py -3 ./tools/state.py gate.
+Если NEW_TRADES_OK — выполни цикл по loop.md для всех 5 инструментов
+(XAUUSD→TREND, EURUSD→COUNTER, USDJPY/USDCAD/GBPJPY→TREND).
+cycle_multi.py для сканирования, position_size.py с --contract-size для FX.
+trade.py --terminal "C:/Program Files/RoboForex MT5 Terminal/terminal64.exe".
+Журнал + tg_notify. Без болтовни.
+
+# === pre-market prompt (05:50 UTC) ===
+Pre-market скан: state.py gate + calendar.py today + cycle_multi.py + WebSearch
+(DXY/US10Y/VIX). Asian range для всех 5 инструментов. Bias + план. journal.py add
+action=PREMARKET. Self-heal: CronList — если кроны пропали, пересоздай.
+
+# === daily report prompt (22:33 UTC) ===
+Daily report: state.py positions — если есть открытые и окно закрыто, закрой все.
+journal.py stats. Полный дневной отчёт по всем инструментам. tg_notify.
