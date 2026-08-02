@@ -1,9 +1,7 @@
-# AI Trader — Autonomous Multi-Instrument MT5 Trading System
+# Hermes Trader FX — Autonomous MT5 Trading System v3
 
-Autonomous AI trader for MetaTrader5, designed to run as a Hermes Agent skill.
-Trades 5 instruments with assigned regimes (trend-following or counter-trend),
-based on a yearly backtest. Enforces a strict trading constitution with risk
-management, news blackouts, spread filters, and real-time price alerts.
+Autonomous AI trader for MetaTrader5, running as a Hermes Agent skill.
+Trades 6 FX pairs with a 3-position averaging-down system and T_EMA trend signals.
 
 ## Quick Start
 
@@ -15,99 +13,130 @@ management, news blackouts, spread filters, and real-time price alerts.
 ### Installation
 ```bash
 # 1. Clone this repo into your Hermes skills directory
-git clone https://github.com/YOUR_USERNAME/ai-trader.git
-cp -r ai-trader ~/.hermes/skills/  # or ~/.claude/skills/ for Claude Code
+git clone https://github.com/x001tk-Igor/Hermes_trader_FX.git
+cp -r Hermes_trader_FX ~/.claude/skills/xau-ai-trader
 
 # 2. Copy .env.example to .env and fill in your values
-cp skills/ai-trader/.env.example skills/ai-trader/.env
+cp skills/xau-ai-trader/.env.example skills/xau-ai-trader/.env
 # Edit .env: MT5_TERMINAL_PATH, MT5_LOGIN, MT5_SERVER, TELEGRAM_BOT_TOKEN, etc.
 
 # 3. Verify MT5 connection
-py -3 skills/ai-trader/tools/state.py gate
+py -3 skills/xau-ai-trader/tools/state.py gate
 
-# 4. Run a scan
-py -3 skills/ai-trader/tools/cycle_multi.py
+# 4. Run a market scan
+py -3 skills/xau-ai-trader/tools/state.py market
 ```
 
-## Instruments and Assigned Regimes
+## Instruments (v3 — 6 FX pairs, all TREND)
 
-Assigned by yearly H1 backtest (with spread costs). Each instrument trades
-ONLY in its assigned regime — no mixing.
+Selected by cross-pair backtest study (30 instruments, 5 tactics, 1 year H1).
+All pairs trade in TREND regime with averaging-down.
 
-| Instrument | Regime | Window UTC | Tactics |
-|---|---|---|---|
-| XAUUSD | TREND | 07:00–20:00 | London Breakout, Trend Pullback, NY Macro |
-| EURUSD | COUNTER | 06:00–22:00 | Liquidity Sweep Reversal, Range Mean Reversion |
-| USDJPY | TREND | 06:00–22:00 | London Breakout, Trend Pullback, NY Macro |
-| USDCAD | TREND | 06:00–22:00 | London Breakout, Trend Pullback, NY Macro |
-| GBPJPY | TREND | 06:00–22:00 | London Breakout, Trend Pullback, NY Macro |
+| Instrument | Regime | Window UTC | Digits | Contract | PF (avg) | WR |
+|---|---|---|---|---|---|---|
+| EURUSD | TREND | 06:00–22:00 | 5 | 100,000 | 1.81 | 82.6% |
+| GBPUSD | TREND | 06:00–22:00 | 5 | 100,000 | 1.77 | 82.5% |
+| USDCAD | TREND | 06:00–22:00 | 5 | 100,000 | 1.69 | 83.1% |
+| EURGBP | TREND | 06:00–22:00 | 5 | 100,000 | 1.63 | 82.2% |
+| NZDCAD | TREND | 06:00–22:00 | 5 | 100,000 | 1.60 | 82.2% |
+| EURAUD | TREND | 06:00–22:00 | 5 | 100,000 | 1.57 | 81.5% |
+
+**Excluded:** JPY pairs (unviable on $100K equity — min lot too risky),
+XAUUSD (PF 0.94 with averaging).
+
+## Averaging-Down System (v3)
+
+Each trade uses up to 3 positions with automatic averaging:
+
+1. **Main entry:** lot sized for 3 positions, SL = 1.5×ATR
+2. **Addon 1:** at -1.0×ATR from entry, own SL = 1.5×ATR
+3. **Addon 2:** at -2.0×ATR from entry, own SL = 1.5×ATR
+4. **TP** = weighted average + 0.5×ATR (recalculated after each addon)
+5. **DD stop:** if total loss on symbol ≥ 1.7% equity → close all positions
+
+**Lot calculation:**
+```
+lot = (equity × 1.7%) / (3 × 1.5 × ATR × contract_size)
+```
+
+**Tactic: T_EMA** — EMA20 vs EMA200 on H1 + ADX(14) > 20.
+- EMA20 > EMA200 → long bias
+- EMA20 < EMA200 → short bias
+- ADX < 20 → no signal (range — secondary tactics C_RSI_BB/C_Sweep apply)
 
 ## Risk Management
 
-- Risk per trade: 0.25% max (0.10–0.15% for counter-trend/news)
-- Daily loss limit: 1.0% → halt new trades
-- Weekly loss limit: 2.5% → halt to end of week
-- Max drawdown: 5.0% → stop + close all + safe mode
-- Max 1 active position per instrument
-- Max 4 new trades per day
+- Max total loss per symbol (3×SL): **1.7% equity**
+- Daily loss limit: **3.0%** → halt new trades
+- Weekly loss limit: **5.0%** → halt to end of week
+- Max drawdown: **5.0%** → stop + close all + alert
+- Max 8 new entries per day (across all 6 pairs)
+- Max 3 positions per symbol, max 6 symbols simultaneously
 - Friday: no new entries after 19:00 UTC, close all by 19:30 UTC
-- Mandatory Stop Loss on every trade
-- EV after costs ≥ +0.25R, RR ≥ 1.5, confluence ≥ 4/6
-
-### Override Filters (added after 3 SL losses in week 1)
-
-**Filter A — Sweep vs Breakout:**
-If spread > 2× median AND ADX M5 falling at level touch → FORBIDDEN.
-Prevents entering on thin-liquidity sweeps that revert.
-
-**Filter B — SL vs Recent Noise:**
-If `|entry - SL|` < recent 4-bar high-low range → SL inside noise → FORBIDDEN.
-Prevents stop-loss from being hit by normal volatility.
-
-These filters OVERRIDE confluence score. A 5.5/6 setup with wide spread +
-falling ADX + SL inside noise = FORBIDDEN.
+- Mandatory per-position Stop Loss (never removed, never widened)
+- ATR anomaly cap: skip if ATR > 5% of price (gap protection)
 
 ## Architecture
 
 ```
-ai-trader/
-├── SKILL.md                 # Main skill: triggers, account, regimes, schedule
+xau-ai-trader/
+├── SKILL.md                 # Main skill: triggers, pairs, averaging, schedule
 ├── .env.example             # Template for secrets (copy to .env)
 ├── .gitignore
 ├── tools/
-│   ├── xau_env.py           # Config: instruments, regimes, windows, limits
-│   ├── state.py             # Gate verdict + positions + window check
-│   ├── cycle_multi.py       # Scan all 5 instruments in one call
-│   ├── alert_sensor.py      # Background price level monitor → wakes agent
-│   ├── trade.py             # MT5 order execution (open/close/sltp/positions)
-│   ├── position_size.py     # EV/RR/lot calculator (multi-contract)
-│   ├── calendar.py          # Economic calendar + news blackout windows
-│   ├── journal.py           # Trade journal (trades.csv)
-│   ├── tg_notify.py         # Telegram notifications via proxy
-│   ├── hard_limits.md       # Quick reference: all hard limits + filters A/B
+│   ├── xau_env.py           # Config: 6 pairs, AVERAGING, risk limits, currency map
+│   ├── state.py             # Gate + positions + avg-positions + avg-risk + dd-monitor + market
+│   ├── trade.py             # MT5 execution: open/close/sltp/avg-tp/close-symbol
+│   ├── position_size.py     # Lot calculator: fixed mode + --avg-mode (3 positions)
+│   ├── calendar.py          # Economic calendar: 6 currencies, symbol mapping, blackouts
+│   ├── journal.py           # Trade journal with averaging fields (addon_number, avg_group)
+│   ├── alert_sensor.py      # Background price level monitor → Telegram alerts
+│   ├── tg_notify.py         # Telegram notifications
+│   ├── cycle_multi.py       # Multi-instrument scanner (legacy)
+│   ├── hard_limits.md       # Quick reference: all limits + averaging rules
 │   ├── decide_template.md   # Pre-trade decision checklist
-│   ├── loop.md              # Operational cycle steps (0-9)
-│   ├── env.md               # Environment reference (terminal, Python, calendar)
-│   └── cron_template.txt    # Cron job recreation templates
+│   ├── loop.md              # Operational cycle v3 (addon management, DD check)
+│   ├── env.md               # Environment reference
+│   ├── cron_template.txt    # Cron job recreation templates
+│   ├── backtest_tactics.py  # 10-tactic backtest engine
+│   ├── sim_averaging.py     # Averaging-down simulator v1
+│   ├── sim_averaging_v2.py  # v2: per-position SL + DD stop
+│   ├── cross_pair_study.py  # 30-instrument cross-pair study
+│   └── sim_acceleration.py  # Position Acceleration simulator (research)
 ├── constitution/            # Trading rules (source of truth)
-│   └── Qwen_markdown_Ai_trader_XAU.md  # Full trading constitution (2400+ lines)
+│   └── Qwen_markdown_Ai_trader_XAU.md  # Full trading constitution
 └── journal/                 # Runtime data (gitignored)
     └── trades.csv           # Trade log (generated at runtime)
 ```
 
-## Operational Cycle
+## Operational Cycle (v3)
 
-1. **Hourly cycle** (06:01–21:46 UTC): `cycle_multi.py` scans all instruments,
-   agent analyzes setups, opens trades if conditions met, journals everything.
-2. **Alert sensor** (between cycles): `alert_sensor.py` monitors key price levels
-   every 20s. When a level is crossed → sends Telegram alert + exits → wakes
-   agent for immediate analysis.
-3. **Pre-market** (05:50 UTC): macro scan, calendar check, bias formation.
-4. **Daily report** (22:33 UTC): close any open positions, stats, report.
+1. **Trading cycle** (06:01–21:46 UTC, every 15 min):
+   - `state.py gate` — hard-limit check
+   - `calendar.py symbols` — news blackout check
+   - `state.py market` — bid/ask/spread/EMA/ADX/ATR for all 6 pairs
+   - T_EMA signal scan → `position_size.py --avg-mode` → `trade.py open`
+   - `state.py avg-positions` + `avg-risk` — addon management + DD check
+   - `trade.py avg-tp` — recalculate TP after addon
+   - `trade.py close-symbol` — if DD stop triggered
+   - `journal.py add` — log all actions
+2. **Pre-market** (05:50 UTC): macro scan, calendar, bias formation.
+3. **Daily report** (22:33 UTC): close positions, stats, daily summary.
+
+## Backtest Results (2026-08-02, H1, 1 year, $100K equity)
+
+| Method | Total PnL | PF | WR | Worst Trade |
+|---|---|---|---|---|
+| Fixed 0.01 | -$181,976 | 0.00 | 0% | -$382 |
+| **Averaging Down v3** | **+$764,790** | **1.50-1.78** | **81-83%** | **-$2,006** |
+| Position Acceleration ×8 | -$195,787 | 0.00 | 0% | -$386 |
+| Accel Multi-step | -$159,183 | 0.03-0.23 | 1-5% | -$374 |
+
+Averaging down is the only profitable method on intraday FX with T_EMA.
 
 ## Configuration
 
-All secrets and environment-specific settings go in `.env` (see `.env.example`):
+All secrets in `.env` (see `.env.example`):
 - `MT5_TERMINAL_PATH` — path to terminal64.exe
 - `MT5_LOGIN` — account number
 - `MT5_SERVER` — broker server name
@@ -115,8 +144,8 @@ All secrets and environment-specific settings go in `.env` (see `.env.example`):
 - `TELEGRAM_CHAT_ID` — destination chat ID
 - `TELEGRAM_PROXY` — HTTP proxy if Telegram API is blocked
 
-Instrument-specific settings (contract size, digits, spread limits) are in
-`tools/xau_env.py`. Adjust for your broker if different.
+Instrument settings (contract size, digits, spread limits, averaging config)
+in `tools/xau_env.py`. Adjust for your broker if different.
 
 ## Deploying on Another Machine
 
