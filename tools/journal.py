@@ -1,11 +1,14 @@
-"""Trade journal + daily stats for the XAUUSD AI trader (§16).
+"""Trade journal + daily stats for the FX AI trader (v3).
 
-CSV columns (§16.1):
+v3: adds averaging fields (addon_number, avg_group, avg_entry, n_positions).
+
+CSV columns:
   action, entry_date, exit_date, tactic, direction, regime, daily_bias,
   dxy_ctx, y10_ctx, real_yield_ctx, risk_sentiment, confluence, rr, ev_r,
   p_win, entry, sl, tp, sl_dist, risk_pct, lot, spread_in, spread_out,
   atr, session, round_level, liq_sweep, reason_in, reason_out, pnl_usd, pnl_r,
-  errors, notes
+  errors, notes,
+  addon_number, avg_group, avg_entry, n_positions, close_reason
 
 Usage:
   py -3 journal.py add <field=value> ...      -> append a row
@@ -22,6 +25,8 @@ FIELDS = [
  "p_win","entry","sl","tp","sl_dist","risk_pct","lot","spread_in","spread_out",
  "atr","session","round_level","liq_sweep","reason_in","reason_out","pnl_usd","pnl_r",
  "errors","notes",
+ # v3 averaging fields
+ "addon_number","avg_group","avg_entry","n_positions","close_reason",
 ]
 
 
@@ -44,11 +49,18 @@ def cmd_add(kvs):
         if "=" not in kv: continue
         k, v = kv.split("=", 1)
         if k in row: row[k] = v
-    if row["action"] == "OPEN" and not row["entry_date"]: row["entry_date"] = now
-    if row["action"] == "CLOSE" and not row["exit_date"]: row["exit_date"] = now
+    # Auto-fill timestamps
+    if row["action"] in ("OPEN", "ADDON") and not row["entry_date"]:
+        row["entry_date"] = now
+    if row["action"] in ("CLOSE", "SL_HIT", "DD_STOP") and not row["exit_date"]:
+        row["exit_date"] = now
+    # Default addon_number for OPEN
+    if row["action"] == "OPEN" and not row["addon_number"]:
+        row["addon_number"] = "0"  # 0 = main entry
     with open(E.JOURNAL_CSV, "a", newline="") as f:
         csv.DictWriter(f, fieldnames=FIELDS).writerow(row)
     print("APPENDED:", row["action"], row.get("tactic"), row.get("direction"),
+          "addon=" + row.get("addon_number",""), row.get("symbol",""),
           row.get("entry"), row.get("sl"))
 
 
@@ -85,13 +97,13 @@ def cmd_stats():
     print(f"win_rate={len(wins)}/{len(rows)} avg_win={sum(wins)/len(wins) if wins else 0:.2f} "
           f"avg_loss={sum(losses)/len(losses) if losses else 0:.2f} PF={pf:.2f}")
     print(f"consec_losses={consec} realized_today={realized:+.2f} daily_loss%={daily_loss_pct*100:+.2f}%")
-    # gate hint
+    # gate hint (v3 limits: 3% daily, 1.7% per symbol)
     flags = []
-    if daily_loss_pct >= E.DAILY_LOSS_HALT: flags.append("DAILY_LOSS_HALT>=1%")
-    elif daily_loss_pct >= 0.005: flags.append("DAILY_LOSS_>=0.5%:risk<=0.15%,A-only")
+    if daily_loss_pct >= E.DAILY_LOSS_HALT: flags.append("DAILY_LOSS_HALT>=3%")
+    elif daily_loss_pct >= 0.015: flags.append("DAILY_LOSS>=1.5%:reduce_risk")
     if consec >= 4: flags.append("4LOSSES:halt new today")
     elif consec == 3: flags.append("3LOSSES:pause 1h")
-    elif consec == 2: flags.append("2LOSSES:risk<=0.15% next 2h")
+    elif consec == 2: flags.append("2LOSSES:audit")
     print("GATE_HINT:", ", ".join(flags) if flags else "OK")
 
 
