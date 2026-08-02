@@ -1,28 +1,32 @@
-# Self-heal: recreate the XAU-trader durable crons (machine TZ = UTC)
+# Self-heal: recreate the FX-trader durable crons (machine TZ = UTC)
+# v3 — 6 FX pairs, averaging system
 # Use if CronList shows them missing or near 7-day expiry. All durable:true, recurring.
 #
-# Multi-instrument: cycle scans XAUUSD/EURUSD/USDJPY/USDCAD/GBPJPY
-# cycle  (06:01-21:46 UTC):   cron "1,16,31,46 6-21 * * 1-5"  -- runs 1 min AFTER M15 bar close
+# cycle  (06:01-21:46 UTC):   cron "1,16,31,46 6-21 * * 1-5"  — runs 1 min AFTER M15 bar close
 # pre-market (05:50 UTC):     cron "50 5 * * 1-5"
 # daily report (22:33 UTC):   cron "33 22 * * 1-5"
-#
-# CronCreate each with durable=true, recurring=true, and the prompts stored in this
-# session's SKILL.md "Каданс". Recurring auto-expires after 7 days — recreate weekly.
 
 # === cycle prompt ===
-Автономный цикл мульти-инструментного трейдера (счёт из .env, 5 инструментов).
+Автономный цикл FX трейдера (6 пар с усреднением, EURUSD/GBPUSD/USDCAD/EURGBP/NZDCAD/EURAUD).
 СНАЧАЛА resume-шаг 0: py -3 ./tools/state.py gate.
-Если NEW_TRADES_OK — выполни цикл по loop.md для всех 5 инструментов
-(XAUUSD→TREND, EURUSD→COUNTER, USDJPY/USDCAD/GBPJPY→TREND).
-cycle_multi.py для сканирования, position_size.py с --contract-size для FX.
+Если NEW_TRADES_OK — выполни цикл по loop.md:
+1. state.py market для каждой пары
+2. T_EMA signal (EMA20 vs EMA200 + ADX>20 на H1)
+3. position_size.py --avg-mode для sizing
+4. trade.py open для новых сигналов
+5. state.py avg-positions + avg-risk для существующих (addon check, DD check)
+6. trade.py avg-tp после addon
+7. trade.py close-symbol если DD stop
+8. journal.py add для всех действий
 trade.py --terminal "C:/Program Files/RoboForex MT5 Terminal/terminal64.exe".
-Журнал + tg_notify. Без болтовни.
+Без болтовни.
 
 # === pre-market prompt (05:50 UTC) ===
-Pre-market скан: state.py gate + calendar.py today + cycle_multi.py + WebSearch
-(DXY/US10Y/VIX). Asian range для всех 5 инструментов. Bias + план. journal.py add
-action=PREMARKET. Self-heal: CronList — если кроны пропали, пересоздай.
+Pre-market скан: state.py gate + calendar.py today + state.py market для всех 6 пар.
+DXY/US10Y через web. Bias + план. journal.py add action=PREMARKET.
+Self-heal: CronList — если кроны пропали, пересоздай.
 
 # === daily report prompt (22:33 UTC) ===
 Daily report: state.py positions — если есть открытые и окно закрыто, закрой все.
-journal.py stats. Полный дневной отчёт по всем инструментам. tg_notify.
+state.py dd-monitor. journal.py stats. Полный дневной отчёт по всем парам.
+tg_notify.

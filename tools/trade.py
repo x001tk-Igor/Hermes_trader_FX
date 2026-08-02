@@ -289,6 +289,91 @@ def cmd_sltp(args):
     mt5.shutdown()
 
 
+def cmd_avg_tp(args):
+    """Recalculate TP = weighted_avg + 0.5×ATR for all positions on a symbol."""
+    if not _init(args): sys.exit(2)
+    ps = mt5.positions_get(args.symbol)
+    if not ps:
+        print(f"no positions on {args.symbol}"); mt5.shutdown(); return
+
+    # Get ATR from H1
+    rates = mt5.copy_rates_from_pos(args.symbol, mt5.TIMEFRAME_H1, 0, 20)
+    mt5.shutdown()
+    if rates is None or len(rates) < 15:
+        print("cannot get H1 bars for ATR"); return
+
+    trs = []
+    for i in range(len(rates)):
+        if i == 0:
+            trs.append(float(rates[i][2]) - float(rates[i][3]))
+        else:
+            h, l, pc = float(rates[i][2]), float(rates[i][3]), float(rates[i-1][4])
+            trs.append(max(h-l, abs(h-pc), abs(l-pc)))
+    atr_val = sum(trs[-14:]) / 14
+
+    total_lot = sum(p.volume for p in ps)
+    weighted_avg = sum(p.price_open * p.volume for p in ps) / total_lot
+
+    # Determine direction from first position
+    is_long = ps[0].type == 0  # POSITION_TYPE_BUY = 0
+    if is_long:
+        new_tp = weighted_avg + 0.5 * atr_val
+    else:
+        new_tp = weighted_avg - 0.5 * atr_val
+
+    info_digits = 5
+    new_tp = round(new_tp, info_digits)
+
+    print(f"=== AVG-TP for {args.symbol} ===")
+    print(f"  positions={len(ps)} total_lot={total_lot:.2f} weighted_avg={weighted_avg:.5f}")
+    print(f"  ATR={atr_val:.5f} new_tp={new_tp}")
+
+    # Update TP on all positions
+    if not _init(args): sys.exit(2)
+    for p in ps:
+        req = {"action": mt5.TRADE_ACTION_SLTP, "symbol": args.symbol,
+               "position": p.ticket, "sl": p.sl, "tp": new_tp}
+        res = mt5.order_send(req)
+        status = "OK" if res and res.retcode == 10009 else f"FAIL({res.retcode if res else '?'})"
+        print(f"  ticket={p.ticket} tp_update={status}")
+    mt5.shutdown()
+
+
+def cmd_close_all_symbol(args):
+    """Close all positions on a specific symbol."""
+    if not _init(args): sys.exit(2)
+    ps = mt5.positions_get(args.symbol)
+    if not ps:
+        print(f"no positions on {args.symbol}"); mt5.shutdown(); return
+
+    print(f"=== CLOSING {len(ps)} positions on {args.symbol} ===")
+    info = mt5.symbol_info(args.symbol)
+    tick = mt5.symbol_info_tick(args.symbol)
+    closed = 0
+    total_pnl = 0
+    for p in ps:
+        is_long = p.type == 0
+        if is_long:
+            price = tick.bid
+            req = {"action": mt5.TRADE_ACTION_DEAL, "symbol": args.symbol,
+                   "position": p.ticket, "volume": p.volume, "type": mt5.ORDER_TYPE_SELL,
+                   "price": price, "deviation": args.deviation, "filling": _filling(info)}
+        else:
+            price = tick.ask
+            req = {"action": mt5.TRADE_ACTION_DEAL, "symbol": args.symbol,
+                   "position": p.ticket, "volume": p.volume, "type": mt5.ORDER_TYPE_BUY,
+                   "price": price, "deviation": args.deviation, "filling": _filling(info)}
+        res = mt5.order_send(req)
+        if res and res.retcode == 10009:
+            closed += 1
+            total_pnl += p.profit
+            print(f"  ticket={p.ticket} CLOSED profit={p.profit:+.2f}")
+        else:
+            print(f"  ticket={p.ticket} FAIL retcode={res.retcode if res else '?'}")
+    mt5.shutdown()
+    print(f"  closed={closed}/{len(ps)} total_pnl={total_pnl:+.2f}")
+
+
 def main():
     parent = argparse.ArgumentParser(add_help=False)
     parent.add_argument("--hash", default=None)
@@ -323,9 +408,18 @@ def main():
     sp.add_argument("--sl", type=float, default=None)
     sp.add_argument("--tp", type=float, default=None)
 
+    # v3: averaging commands
+    sp = sub.add_parser("avg-tp", parents=[parent])
+    sp.add_argument("--symbol", required=True)
+
+    sp = sub.add_parser("close-symbol", parents=[parent])
+    sp.add_argument("--symbol", required=True)
+    sp.add_argument("--deviation", type=int, default=50)
+
     args = ap.parse_args()
     {"account": cmd_account, "positions": cmd_positions, "probe": cmd_probe,
-     "open": cmd_open, "close": cmd_close, "sltp": cmd_sltp}[args.cmd](args)
+     "open": cmd_open, "close": cmd_close, "sltp": cmd_sltp,
+     "avg-tp": cmd_avg_tp, "close-symbol": cmd_close_all_symbol}[args.cmd](args)
 
 
 if __name__ == "__main__":

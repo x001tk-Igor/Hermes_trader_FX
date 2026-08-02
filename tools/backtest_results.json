@@ -1,0 +1,90 @@
+{
+  "XAUUSD": {
+    "symbol": "XAUUSD",
+    "total_trades": 2400,
+    "win_rate": 45.375,
+    "profit_factor": 0.9430901700088793,
+    "total_pnl": -2064.3321102026553,
+    "by_tactic": {
+      "T1_ATR_Trail": 2079,
+      "T4_EMA_VWAP": 169,
+      "T5_PostNews": 74,
+      "C2_RSI_BB": 45,
+      "C5_HTF_Divergence": 3,
+      "C4_VWAP_Absorption": 10,
+      "C1_LiquiditySweep": 15,
+      "T3_EMA_Pullback": 5
+    }
+  },
+  "EURUSD": {
+    "symbol": "EURUSD",
+    "total_trades": 2343,
+    "win_rate": 37.00384122919334,
+    "profit_factor": 0.6971637207231351,
+    "total_pnl": -0.7978951867471,
+    "by_tactic": {
+      "C1_LiquiditySweep": 52,
+      "C2_RSI_BB": 38,
+      "C5_HTF_Divergence": 247,
+      "T1_ATR_Trail": 1650,
+      "C4_VWAP_Absorption": 65,
+      "T5_PostNews": 77,
+      "T4_EMA_VWAP": 193,
+      "C3_VolSpikeFade": 18,
+      "T3_EMA_Pullback": 3
+    }
+  },
+  "USDJPY": {
+    "symbol": "USDJPY",
+    "total_trades": 2324,
+    "win_rate": 40.017211703958694,
+    "profit_factor": 0.7538820625286997,
+    "total_pnl": -121.54909301641918,
+    "by_tactic": {
+      "C1_LiquiditySweep": 30,
+      "T4_EMA_VWAP": 205,
+      "T5_PostNews": 67,
+      "T1_ATR_Trail": 1948,
+      "C2_RSI_BB": 38,
+      "T3_EMA_Pullback": 2,
+      "C3_VolSpikeFade": 5,
+      "C4_VWAP_Absorption": 25,
+      "C5_HTF_Divergence": 4
+    }
+  },
+  "USDCAD": {
+    "symbol": "USDCAD",
+    "total_trades": 2318,
+    "win_rate": 46.33304572907679,
+    "profit_factor": 0.8831037381319591,
+    "total_pnl": -0.3109194380189245,
+    "by_tactic": {
+      "T1_ATR_Trail": 1894,
+      "T4_EMA_VWAP": 229,
+      "T5_PostNews": 101,
+      "C1_LiquiditySweep": 21,
+      "C2_RSI_BB": 29,
+      "C4_VWAP_Absorption": 29,
+      "C5_HTF_Divergence": 7,
+      "C3_VolSpikeFade": 5,
+      "T3_EMA_Pullback": 3
+    }
+  },
+  "GBPJPY": {
+    "symbol": "GBPJPY",
+    "total_trades": 2175,
+    "win_rate": 39.95402298850575,
+    "profit_factor": 0.7734555174252071,
+    "total_pnl": -130.89690179419705,
+    "by_tactic": {
+      "T4_EMA_VWAP": 275,
+      "T5_PostNews": 98,
+      "C1_LiquiditySweep": 30,
+      "T1_ATR_Trail": 1710,
+      "C2_RSI_BB": 34,
+      "C4_VWAP_Absorption": 23,
+      "C3_VolSpikeFade": 2,
+      "C5_HTF_Divergence": 3
+    }
+  }
+}

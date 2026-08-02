@@ -1,4 +1,8 @@
-"""Shared constants for the multi-instrument AI trader (account YOUR_MT5_LOGIN)."""
+"""Shared constants for the multi-instrument AI trader (account YOUR_MT5_LOGIN).
+
+v3 — Averaging-down system: 6 FX pairs, all TREND regime, 3-position averaging.
+Backtested 2026-08-02: PF 1.57-1.81 with averaging on T_EMA tactic.
+"""
 from pathlib import Path
 import os
 
@@ -8,62 +12,91 @@ HASH = "5FFA568149E88FCD5B44D926DCFEAA79"  # data-dir hash (for reference)
 LOGIN = int(os.environ.get("MT5_LOGIN", "0"))  # set via .env
 SERVER = os.environ.get("MT5_SERVER", "RoboForex-Pro")
 
-SYMBOL = "XAUUSD"  # default, but now multi-symbol
-
-# Assigned regimes (yearly backtest 2026-07-31)
+# ── Instruments: 6 FX pairs, all TREND regime ──────────────────────────
+# Selected by cross_pair_study.py (2026-08-02): PF>1.5 with averaging, no JPY, no gold.
 REGIMES = {
-    "XAUUSD": "TREND",
-    "EURUSD": "COUNTER",
-    "USDJPY": "TREND",
+    "EURUSD": "TREND",
+    "GBPUSD": "TREND",
     "USDCAD": "TREND",
-    "GBPJPY": "TREND",
+    "EURGBP": "TREND",
+    "NZDCAD": "TREND",
+    "EURAUD": "TREND",
 }
-TREND_TACTICS = ("LondonBreakout", "TrendPullbackContinuation", "NYMacroContinuation")
-COUNTER_TACTICS = ("LiquiditySweepReversal", "RangeMeanReversion")
-CONTRACT_SIZE = 100.0      # 1 lot = 100 oz
-TICK_SIZE = 0.01           # price increment
-TICK_VALUE = 1.0           # $ per 0.01 move per 1 lot (account USD)
 
+# Per-instrument metadata
+INSTRUMENT_INFO = {
+    "EURUSD": {"digits": 5, "contract": 100000, "window": (6, 0, 22, 0)},
+    "GBPUSD": {"digits": 5, "contract": 100000, "window": (6, 0, 22, 0)},
+    "USDCAD": {"digits": 5, "contract": 100000, "window": (6, 0, 22, 0)},
+    "EURGBP": {"digits": 5, "contract": 100000, "window": (6, 0, 22, 0)},
+    "NZDCAD": {"digits": 5, "contract": 100000, "window": (6, 0, 22, 0)},
+    "EURAUD": {"digits": 5, "contract": 100000, "window": (6, 0, 22, 0)},
+}
+
+# Active tactics (T_EMA = primary, C_RSI_BB/C_Sweep = secondary for range conditions)
+TREND_TACTICS = ("T_EMA",)  # EMA20 vs EMA200 + ADX>20
+COUNTER_TACTICS = ("C_RSI_BB", "C_Sweep")  # secondary, only when ADX<20
+
+# ── Averaging configuration ───────────────────────────────────────────
+AVERAGING = {
+    "max_addons": 2,              # max 3 positions total (1 main + 2 addons)
+    "addon1_atr_mult": 1.0,      # first addon at -1.0×ATR from entry
+    "addon2_atr_mult": 2.0,      # second addon at -2.0×ATR from entry
+    "sl_atr_mult": 1.5,          # each position SL = 1.5×ATR from its own entry
+    "tp_atr_mult": 0.5,          # TP = weighted_avg + 0.5×ATR
+    "dd_stop_pct": 1.7,          # close all if total loss ≥ 1.7% equity (buffer under 2%)
+    "max_positions_per_symbol": 3,
+    "lot_round": 0.01,           # round down to 0.01
+    "atr_anomaly_pct": 5.0,      # skip if ATR > 5% of price (gap protection)
+}
+
+# ── Risk limits ───────────────────────────────────────────────────────
+RISK_PER_TRADE_MAX = 0.0025    # 0.25% of equity (base, for fixed mode)
+RISK_AVG_TOTAL = 0.017         # 1.7% max total loss per symbol with averaging
+DAILY_LOSS_HALT = 0.03         # 3.0% daily loss → halt new trades
+WEEKLY_LOSS_HALT = 0.05        # 5.0% weekly loss → halt to end of week
+DD_WARN3 = 0.03
+DD_WARN4 = 0.04
+DD_HALT5 = 0.05
+MAX_NEW_TRADES_DAY = 8         # 8 entries across 6 pairs (was 4 for single pair)
+MAX_SYMBOLS_TRADED = 6
+
+# ── Trading window (UTC) ─────────────────────────────────────────────
+# All FX pairs: 06:00-22:00 UTC
+WINDOW_START_UTC = {sym: (info["window"][0], info["window"][1]) for sym, info in INSTRUMENT_INFO.items()}
+WINDOW_END_UTC = {sym: (info["window"][2], info["window"][3]) for sym, info in INSTRUMENT_INFO.items()}
+FRI_NO_NEW_AFTER_UTC = 19, 0   # Friday: no new entries after 19:00
+FRI_CLOSE_BY_UTC = 19, 30      # Friday: close all by 19:30
+
+# ── Spread limits ─────────────────────────────────────────────────────
+# Per-instrument spread limits in points (configurable per broker)
+SPREAD_MAX_POINTS = {
+    "EURUSD": 20,   # 2.0 pips
+    "GBPUSD": 25,   # 2.5 pips
+    "USDCAD": 30,   # 3.0 pips
+    "EURGBP": 20,   # 2.0 pips
+    "NZDCAD": 35,   # 3.5 pips
+    "EURAUD": 35,   # 3.5 pips
+}
+SPREAD_MEDIAN_X = 2.0  # also no trade if > 2.0× 5d median
+
+# ── Lot settings ──────────────────────────────────────────────────────
 LOT_MIN = 0.01
 LOT_STEP = 0.01
 LOT_MAX = 500.0
 
-# Constitution hard limits (see hard_limits.md / full reglament)
-RISK_PER_TRADE_MAX = 0.0025   # 0.25% of equity
-RISK_REDUCE_05DD   = 0.0015   # 0.15% (drawdown>=3% or daily loss>=0.5%)
-RISK_REDUCE_04DD   = 0.0010   # 0.10% (drawdown>=4%)
-DAILY_LOSS_HALT    = 0.01     # 1.0% -> halt new trades
-WEEKLY_LOSS_HALT   = 0.025    # 2.5%
-DD_WARN3           = 0.03
-DD_WARN4           = 0.04
-DD_HALT5            = 0.05
-MAX_NEW_TRADES_DAY  = 4
-MAX_POSITIONS       = 1
-
-# Trading window (UTC) — per instrument type
-WINDOW_START_UTC = {"XAUUSD": (7, 0), "EURUSD": (6, 0), "USDJPY": (6, 0),
-                     "USDCAD": (6, 0), "GBPJPY": (6, 0)}   # 07:00 gold, 06:00 FX
-WINDOW_END_UTC   = {"XAUUSD": (20, 0), "EURUSD": (22, 0), "USDJPY": (22, 0),
-                     "USDCAD": (22, 0), "GBPJPY": (22, 0)}  # 20:00 gold, 22:00 FX
-FRI_NO_NEW_AFTER_UTC = 19, 0   # Friday: no new entries after 19:00
-FRI_CLOSE_BY_UTC     = 19, 30  # Friday: close all by 19:30
-
-# Spread limits (USD)
-SPREAD_MAX_NORMAL = 0.35     # no trade above
-SPREAD_HALT       = 0.50     # halt trading fully
-SPREAD_MEDIAN_X   = 1.5      # also no trade if > 1.5x 5d median
-
-# Paths
+# ── Paths ─────────────────────────────────────────────────────────────
 SKILL_DIR = Path(__file__).resolve().parent.parent
 JOURNAL_DIR = SKILL_DIR / "journal"
 JOURNAL_CSV = JOURNAL_DIR / "trades.csv"
 PEAK_FILE = SKILL_DIR / "peak_equity.txt"
-SOD_FILE = SKILL_DIR / "sod_equity.txt"  # start-of-day equity marker
+SOD_FILE = SKILL_DIR / "sod_equity.txt"
+PROPOSALS_CSV = JOURNAL_DIR / "proposals.csv"
 
-# trade.py
-TRADE_PY = str(Path.home() / ".claude" / "skills" / "mt5-manual-trading" / "tools" / "trade.py")
+# trade.py (bundled in tools/)
+TRADE_PY = str(Path(__file__).resolve().parent / "trade.py")
 
-# Extended-impact events (§2.11) — 60 min before / 30 min after blackout
+# ── News blackout ─────────────────────────────────────────────────────
 EXTENDED_KEYWORDS = (
     "fomc", "fed rate", "interest rate", "press conference", "powell",
     "yellen", "cpi", "core cpi", "pce", "core pce", "non-farm", "nfp",
@@ -71,6 +104,15 @@ EXTENDED_KEYWORDS = (
 )
 EXTENDED_PRE_MIN = 60
 EXTENDED_POST_MIN = 30
-# Other high-impact: 30 before / 15 after
 HIGH_PRE_MIN = 30
 HIGH_POST_MIN = 15
+
+# Currency mapping for news filter
+CURRENCY_MAP = {
+    "EURUSD": ["EUR", "USD"],
+    "GBPUSD": ["GBP", "USD"],
+    "USDCAD": ["USD", "CAD"],
+    "EURGBP": ["EUR", "GBP"],
+    "NZDCAD": ["NZD", "CAD"],
+    "EURAUD": ["EUR", "AUD"],
+}
