@@ -289,10 +289,18 @@ def cmd_sltp(args):
     mt5.shutdown()
 
 
+def _get_positions_sym(mt5, sym):
+    """Get positions for a symbol, handling brokers where positions_get(sym) fails."""
+    all_pos = mt5.positions_get()
+    if not all_pos:
+        return []
+    return [p for p in all_pos if p.symbol == sym]
+
+
 def cmd_avg_tp(args):
     """Recalculate TP = weighted_avg + 0.5×ATR for all positions on a symbol."""
     if not _init(args): sys.exit(2)
-    ps = mt5.positions_get(args.symbol)
+    ps = _get_positions_sym(mt5, args.symbol)
     if not ps:
         print(f"no positions on {args.symbol}"); mt5.shutdown(); return
 
@@ -342,7 +350,7 @@ def cmd_avg_tp(args):
 def cmd_close_all_symbol(args):
     """Close all positions on a specific symbol."""
     if not _init(args): sys.exit(2)
-    ps = mt5.positions_get(args.symbol)
+    ps = _get_positions_sym(mt5, args.symbol)
     if not ps:
         print(f"no positions on {args.symbol}"); mt5.shutdown(); return
 

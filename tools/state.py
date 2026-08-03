@@ -134,10 +134,18 @@ def cmd_positions():
               f"sl={p.sl} tp={p.tp} profit={p.profit:.2f}")
 
 
+def _get_positions_for_symbol(mt5, sym):
+    """Get positions for a symbol, handling brokers where positions_get(sym) fails."""
+    all_pos = mt5.positions_get()
+    if not all_pos:
+        return []
+    return [p for p in all_pos if p.symbol == sym]
+
+
 def cmd_avg_positions(sym):
     """Show all positions for a symbol, grouped as averaging set."""
     init_mt5()
-    ps = mt5.positions_get(sym) or ()
+    ps = _get_positions_for_symbol(mt5, sym)
     ai = mt5.account_info()
     mt5.shutdown()
     if not ps:
@@ -159,7 +167,7 @@ def cmd_avg_positions(sym):
 def cmd_avg_risk(sym, equity=None):
     """Calculate total risk/PnL for a symbol's averaging group."""
     init_mt5()
-    ps = mt5.positions_get(sym) or ()
+    ps = _get_positions_for_symbol(mt5, sym)
     ai = mt5.account_info()
     tick = mt5.symbol_info_tick(sym)
     mt5.shutdown()
@@ -205,7 +213,7 @@ def cmd_dd_monitor():
     print(f"=== DD MONITOR (equity={ai.equity:.2f}, limit={AVG_DD_STOP*100:.1f}%) ===")
     for sym in sorted(symbols_with_pos):
         init_mt5()
-        ps = mt5.positions_get(sym) or ()
+        ps = _get_positions_for_symbol(mt5, sym)
         mt5.shutdown()
         if not ps: continue
 
