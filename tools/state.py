@@ -30,7 +30,7 @@ DAILY_LOSS_HALT = 0.03       # 3%
 WEEKLY_LOSS_HALT = 0.05      # 5%
 DD_HALT5 = 0.05              # 5%
 MAX_NEW_TRADES_DAY = 8
-AVG_DD_STOP = 0.017          # 1.7% per symbol
+AVG_DD_STOP = 0.025          # 2.5% per symbol
 AVG_MAX_POSITIONS = 3
 
 SKILL_DIR = os.path.dirname(os.path.abspath(__file__))

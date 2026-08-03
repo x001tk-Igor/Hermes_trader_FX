@@ -36,9 +36,9 @@ For EACH symbol in xau_env.REGIMES:
 
 ## 4. Size (averaging mode)
 ```
-py -3 position_size.py --avg-mode --equity E --max-loss-pct 1.7 --atr A --contract-size C
+py -3 position_size.py --avg-mode --equity E --max-loss-pct 2.5 --atr A --contract-size C
 ```
-- lot = (equity × 1.7%) / (3 × 1.5×ATR × contract)
+- lot = (equity × 2.5%) / (3 × 1.5×ATR × contract)
 - If lot < 0.01 → SKIP (too risky for equity).
 - Record lot for all 3 potential positions.
 
@@ -76,11 +76,11 @@ py -3 state.py avg-positions --symbol SYMBOL
 py -3 state.py avg-risk --symbol SYMBOL --equity E
 ```
 - Calculate total PnL (realized from SL hits + unrealized) for this symbol.
-- If total loss ≥ 1.7% of equity → CLOSE ALL positions on this symbol:
+- If total loss ≥ 2.5% of equity → CLOSE ALL positions on this symbol:
   ```
   py -3 trade.py close --symbol SYMBOL --all --terminal "..."
   ```
-  - Journal: `journal.py add action=DD_STOP symbol=SYM pnl=... reason=dd_stop_1.7pct`
+  - Journal: `journal.py add action=DD_STOP symbol=SYM pnl=... reason=dd_stop_2.5pct`
 
 ## 8. TP / SL management
 - If TP hit on all positions → trade complete, journal CLOSE with PnL.

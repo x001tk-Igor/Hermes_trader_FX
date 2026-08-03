@@ -20,8 +20,8 @@ stable/reproducible > profit. Conflict → choose the higher item. Unclear marke
 - SL is NEVER moved, NEVER widened, NEVER removed
 - TP = weighted_average + 0.5×ATR (recalculated after each addon)
 - TP applies to ALL open positions on that symbol simultaneously
-- DD stop: if total unrealized+realized loss on symbol ≥ 1.7% equity → close ALL positions
-- Lot is calculated ONCE for all 3 positions: lot = (equity × 1.7%) / (3 × 1.5×ATR × contract)
+- DD stop: if total unrealized+realized loss on symbol ≥ 2.5% equity → close ALL positions
+- Lot is calculated ONCE for all 3 positions: lot = (equity × 2.5%) / (3 × 1.5×ATR × contract)
 - If calculated lot < 0.01 → SKIP (too risky for equity size)
 - If ATR > 5% of price → SKIP (anomaly/gap protection)
 
@@ -34,7 +34,7 @@ stable/reproducible > profit. Conflict → choose the higher item. Unclear marke
 - Averaging without per-position SL
 
 ## Risk limits
-- Max total loss per symbol (3×SL): 1.7% equity
+- Max total loss per symbol (3×SL): 2.5% equity
 - Daily loss: 3.0% → halt new trades (6 pairs × ~0.5% = 3% max)
 - Weekly loss: 5.0% → halt to end of week
 - DD from equity peak: 5% → stop + close + alert

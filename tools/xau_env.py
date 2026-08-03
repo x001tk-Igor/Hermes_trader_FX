@@ -44,7 +44,7 @@ AVERAGING = {
     "addon2_atr_mult": 2.0,      # second addon at -2.0×ATR from entry
     "sl_atr_mult": 1.5,          # each position SL = 1.5×ATR from its own entry
     "tp_atr_mult": 0.5,          # TP = weighted_avg + 0.5×ATR
-    "dd_stop_pct": 1.7,          # close all if total loss ≥ 1.7% equity (buffer under 2%)
+    "dd_stop_pct": 2.5,          # close all if total loss ≥ 2.5% equity (room before 3% daily)
     "max_positions_per_symbol": 3,
     "lot_round": 0.01,           # round down to 0.01
     "atr_anomaly_pct": 5.0,      # skip if ATR > 5% of price (gap protection)
@@ -52,7 +52,7 @@ AVERAGING = {
 
 # ── Risk limits ───────────────────────────────────────────────────────
 RISK_PER_TRADE_MAX = 0.0025    # 0.25% of equity (base, for fixed mode)
-RISK_AVG_TOTAL = 0.017         # 1.7% max total loss per symbol with averaging
+RISK_AVG_TOTAL = 0.025        # 2.5% max total loss per symbol with averaging
 DAILY_LOSS_HALT = 0.03         # 3.0% daily loss → halt new trades
 WEEKLY_LOSS_HALT = 0.05        # 5.0% weekly loss → halt to end of week
 DD_WARN3 = 0.03
