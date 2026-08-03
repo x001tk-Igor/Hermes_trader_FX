@@ -299,7 +299,7 @@ def _get_positions_sym(mt5, sym):
 
 def cmd_avg_tp(args):
     """Recalculate TP = weighted_avg + 0.5×ATR for all positions on a symbol."""
-    if not _init(args): sys.exit(2)
+    if not init_mt5(args): sys.exit(2)
     ps = _get_positions_sym(mt5, args.symbol)
     if not ps:
         print(f"no positions on {args.symbol}"); mt5.shutdown(); return
@@ -337,7 +337,7 @@ def cmd_avg_tp(args):
     print(f"  ATR={atr_val:.5f} new_tp={new_tp}")
 
     # Update TP on all positions
-    if not _init(args): sys.exit(2)
+    if not init_mt5(args): sys.exit(2)
     for p in ps:
         req = {"action": mt5.TRADE_ACTION_SLTP, "symbol": args.symbol,
                "position": p.ticket, "sl": p.sl, "tp": new_tp}
@@ -349,7 +349,7 @@ def cmd_avg_tp(args):
 
 def cmd_close_all_symbol(args):
     """Close all positions on a specific symbol."""
-    if not _init(args): sys.exit(2)
+    if not init_mt5(args): sys.exit(2)
     ps = _get_positions_sym(mt5, args.symbol)
     if not ps:
         print(f"no positions on {args.symbol}"); mt5.shutdown(); return

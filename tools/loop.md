@@ -1,99 +1,129 @@
-# Trade cycle v3 — averaging-down system (one cron fire)
+# Trade cycle v4 — full constitution-compliant cycle (one hour)
 
-Run in order. Stop the cycle at the first hard block. Log every meaningful decision
-(open, addon, skip, close) via `journal.py add`.
+Run ALL 7 steps in order. Do NOT skip steps. No trade without full analysis.
 
-## 0. Window + hard gate
+## Step 1. Hard limits (gate)
 ```
-py -3 state.py gate
+py -3 tools/state.py gate
 ```
-- VERDICT `FORCE_FLAT` → close all positions on all symbols, journal, alert, END.
-- VERDICT `HALT_NEW` → manage open positions only (step 7-8), no new entries.
-- VERDICT `NEW_TRADES_OK` → continue.
+- VERDICT FORCE_FLAT → close all, alert, END.
+- VERDICT HALT_NEW → skip to Step 7 (manage only). No new entries.
+- VERDICT NEW_TRADES_OK → continue to Step 2.
+- Check: open instruments ≤ 3 (excluding addons). If 3 open → no new entries.
 
-## 1. Calendar blackout
+## Step 2. News (calendar)
 ```
-py -3 calendar.py today
+py -3 tools/calendar.py symbols
+py -3 tools/calendar.py today
 ```
-- `NOW_INSIDE_BLACKOUT: True` for any currency in CURRENCY_MAP → no new entries for
-  affected symbols this fire; manage existing only.
+- Symbols in blackout → skip for new entries. Addons/management OK.
+- Events in next 60 min → block affected pairs.
+- Record in journal: `journal.py add action=NEWS notes="blocked=EURUSD,GBPUSD until 14:30"`
 
-## 2. Perceive market (per symbol)
+## Step 3. Market context + macro
+### 3.1 Technical (every cycle)
 ```
-py -3 state.py market [SYMBOL]
+py -3 tools/state.py market
 ```
-- Get bid/ask, spread, H1 EMA20/EMA200, ADX(14), ATR(14) for each symbol.
-- If spread > SPREAD_MAX_POINTS[symbol] → no new entries for this symbol.
-- If ATR > 5% of price → SKIP (anomaly cap).
+- For each pair: bid/ask/spread/EMA20/EMA200/ADX/ATR
+- Spread > limit → skip pair
+- ATR > 5% of price → skip pair (anomaly)
 
-## 3. T_EMA signal scan (per symbol, TREND regime)
-For EACH symbol in xau_env.REGIMES:
-- H1: EMA20 > EMA200 AND ADX(14) > 20 → long bias
-- H1: EMA20 < EMA200 AND ADX(14) > 20 → short bias
-- ADX < 20 → no T_EMA signal (range — check secondary tactics C_RSI_BB/C_Sweep)
-- If no existing position on this symbol AND signal present → proceed to step 4.
-- If existing position on this symbol → skip to step 6 (addon/management).
+### 3.2 Macro (update every 2-3 hours)
+- DXY: rising / falling / flat
+- US 10Y yields: rising / falling / flat
+- Risk-on / risk-off: S&P futures, VIX
+- Session: Asian / London / NY / overlap / low-liquidity
+- Use web search if needed
 
-## 4. Size (averaging mode)
-```
-py -3 position_size.py --avg-mode --equity E --max-loss-pct 2.5 --atr A --contract-size C
-```
-- lot = (equity × 2.5%) / (3 × 2.5×ATR × contract)
-- If lot < 0.01 → SKIP (too risky for equity).
-- Record lot for all 3 potential positions.
+### 3.3 Bias per pair
+- EURUSD: DXY down + EUR strong → bullish. DXY up → bearish.
+- GBPUSD: DXY down + GBP strong → bullish.
+- USDCAD: DXY up + oil down → bullish (USDCAD up). CAD strong → bearish.
+- EURGBP: EUR vs GBP dynamics, less USD-dependent.
+- NZDCAD: NZD vs CAD — commodity currencies, risk sentiment.
+- EURAUD: EUR vs AUD — risk-on → AUD strong, risk-off → EUR strong.
 
-## 5. Execute main entry
-```
-py -3 trade.py open --symbol SYMBOL --side buy|sell --lot LOT --sl SL --tp TP --terminal "..."
-```
-- SL = entry − 1.5×ATR (long) or entry + 1.5×ATR (short)
-- TP = entry + 0.5×ATR (long) or entry − 0.5×ATR (short) — initial, will be recalculated
-- Confirm ticket + fill (no fake checkmarks).
-- Journal OPEN: `journal.py add action=OPEN symbol=SYM tactic=T_EMA direction=...
-  entry=... sl=... tp=... lot=... atr=... adx=... ema20=... ema200=... avg_group=1`
+Record bias: `journal.py add action=BIAS notes="EURUSD=bullish GBPUSD=bullish..."`
 
-## 6. Addon management (if existing position on symbol)
-```
-py -3 state.py avg-positions --symbol SYMBOL
-```
-- Get all open positions for this symbol: tickets, entries, lots, PnL.
-- Calculate current price distance from main entry in ATR units.
-- If price is at -1.0×ATR from main entry AND only 1 position → ADDON 1:
-  ```
-  py -3 trade.py open --symbol SYMBOL --side buy|sell --lot LOT --sl SL2 --tp TP_new --terminal "..."
-  ```
-  - SL2 = addon1_entry − 1.5×ATR (own SL)
-  - Recalculate TP: weighted_avg + 0.5×ATR → update TP on ALL positions
-  - Journal ADDON: `journal.py add action=ADDON symbol=SYM addon=1 entry=... sl=... new_tp=...`
-- If price is at -2.0×ATR from main entry AND only 2 positions → ADDON 2:
-  - Same as above with SL3 = addon2_entry − 1.5×ATR
-  - Recalculate TP: new weighted_avg + 0.5×ATR → update TP on ALL positions
-  - Journal ADDON: `journal.py add action=ADDON symbol=SYM addon=2 ...`
-- If 3 positions already → no more addons, just manage (step 7-8).
+## Step 4. Regime determination (per pair, for pairs without position)
+Analyze H1 chart structure:
+- TREND_UP: EMA20 > EMA200, ADX > 25, price above EMA20, higher highs/higher lows
+- TREND_DOWN: EMA20 < EMA200, ADX > 25, price below EMA20, lower highs/lower lows
+- RANGE: ADX < 20, price between EMAs, horizontal channel, 2+ tests
+- BREAKOUT: price breaking key level (PDH/PDL/Donchian/round) with volume
+- UNCLEAR: ADX 20-25, price around EMA20, no clear structure → NO TRADE
 
-## 7. DD check (every fire, for each symbol with open positions)
-```
-py -3 state.py avg-risk --symbol SYMBOL --equity E
-```
-- Calculate total PnL (realized from SL hits + unrealized) for this symbol.
-- If total loss ≥ 2.5% of equity → CLOSE ALL positions on this symbol:
-  ```
-  py -3 trade.py close --symbol SYMBOL --all --terminal "..."
-  ```
-  - Journal: `journal.py add action=DD_STOP symbol=SYM pnl=... reason=dd_stop_2.5pct`
+If UNCLEAR → skip pair. "No trade" is a decision.
 
-## 8. TP / SL management
-- If TP hit on all positions → trade complete, journal CLOSE with PnL.
-- If per-position SL hit → that position closes automatically.
-  - Remaining positions continue with their own SLs and updated TP.
-  - Journal: `journal.py add action=SL_HIT symbol=SYM ticket=... pnl=...`
-- Time stop: if 72 bars (H1) since first entry and no resolution → evaluate:
-  - If trend still intact → hold.
-  - If trend broken → close all, journal.
-- Friday ≥19:00 UTC → no new; ≥19:30 → close all.
-- Invalidation: H4 trend reversed (EMA20 crossed EMA200 on H4) → close all.
+## Step 5. Setup search (per pair, only if regime + bias align)
+Match ONE tactic to current price action:
 
-## 9. Report
-- No per-trade chatter. Alert on: DD stop, daily 3%, weekly 5%, spread anomaly,
-  execution error, all-positions-closed, model degradation.
-- Daily report from 22:33 UTC cron.
+### TREND pairs:
+- **Trend Pullback**: price returned to EMA20 on H1/M15, trigger candle (pin bar, engulfing, RSI reversal from 40-50 for long / 50-60 for short). DXY/yields support.
+- **London Breakout**: price breaks Asian range (00:00-07:00 UTC), 07:00-10:00 UTC, M15 close beyond range. DXY/yields support.
+- **NY Macro**: after US data (12:30-16:00 UTC), price breaks pre-news range, cooldown passed. DXY/yields confirm.
+
+### RANGE pairs:
+- **Range Mean Reversion**: ADX < 20, range exists 4+ hours, 2+ boundary tests, rejection candle at boundary. DXY/yields neutral.
+- **RSI + BB**: close beyond BB(20,2) + RSI extreme (< 30 or > 70) + ADX < 20. Reversion to middle BB.
+
+### BREAKOUT/REVERSAL:
+- **Liquidity Sweep**: false break of PDH/PDL/session level, quick return inside, 3-candle confirmation. Confluence ≥ 5.
+- **Donchian Breakout**: price breaks 20-bar Donchian channel, ADX rising, volume above average.
+
+If NO setup matches current price action → NO TRADE. Do not force.
+
+## Step 6. Confluence + EV
+### Confluence Score (6 factors, 1 point each):
+1. Trend H1/H4 aligns with trade direction
+2. Regime + session fit the tactic
+3. DXY supports (or neutral)
+4. Yields / risk sentiment support (or neutral)
+5. Safe news + normal spread
+6. Quality technical trigger + RR ≥ 1.5 + EV ≥ +0.25R
+
+Categories: A (5-6), B (4), FORBIDDEN (< 4). Counter-trend: minimum 5.
+
+### EV calculation:
+```
+py -3 tools/position_size.py --ev --p-win P --rr R --entry E --sl S --contract-size 100000 --spread-usd 0.0001
+```
+- EV_R = P_win × RR − (1−P_win) × 1 − Costs_R
+- Need: EV ≥ +0.25R, edge ≥ +5%
+- If confluence < 4 OR EV < 0.25R → NO TRADE
+
+## Step 7. Execution + management
+
+### 7.1 New entry (if Steps 1-6 all passed):
+```
+py -3 tools/position_size.py --avg-mode --equity E --max-loss-pct 2.5 --atr A --contract-size 100000
+py -3 tools/trade.py open --symbol S --side buy|sell --lot L --sl SL --tp TP --terminal "..."
+```
+- SL = 2.5 × ATR from entry
+- TP = entry + 0.5 × ATR (initial, recalculated after addons)
+
+### 7.2 Journal with FULL analysis:
+```
+py -3 tools/journal.py add action=OPEN symbol=EURUSD tactic=TrendPullback direction=long
+  entry=... sl=... tp=... lot=... atr=... adx=... regime=TREND_UP
+  dxy_ctx=falling y10_ctx=falling risk_sentiment=on
+  confluence=5 ev_r=0.35 rr=2.0 p_win=0.55
+  reason="Pullback to EMA20 on H1, pin bar on M15, DXY falling, no news"
+```
+
+### 7.3 Manage existing positions:
+- Check addon distances: `state.py avg-positions SYMBOL`
+- If price at -1×ATR and 1 position → addon 1 (same lot, own SL=2.5×ATR)
+- If price at -2×ATR and 2 positions → addon 2
+- After addon: `trade.py avg-tp --symbol SYMBOL` (recalculate TP)
+- DD check: `state.py avg-risk SYMBOL` (2.5% → close all)
+- Time stop: position open > 72 H1 bars and not developing → evaluate close
+- Signal invalidation: H4 trend reversed → close all on that symbol
+
+### 7.4 Telegram report:
+- New entries: symbol, direction, tactic, confluence, EV, reason
+- Addons: symbol, addon number, new TP
+- DD stops: symbol, PnL
+- TP/SL hits: symbol, PnL
+- If nothing happened: brief status (equity, positions, next event)

@@ -1,14 +1,17 @@
-# Hard limits digest (v3 — averaging system, 6 FX pairs)
+# Hard limits digest (v4 — averaging + full constitution cycle, 6 FX pairs)
 
 ## Hierarchy (§1)
 Capital preservation > risk limits > execution/costs > +EV after costs >
 stable/reproducible > profit. Conflict → choose the higher item. Unclear market → no trade.
+**No trade without full 7-step analysis (limits→news→macro→regime→setup→confluence→EV).**
 
-## Instruments & regime (v3 — backtest 2026-08-02)
+## Instruments & regime (v4 — backtest 2026-08-02)
 - 6 FX pairs, ALL TREND regime (with averaging):
   EURUSD, GBPUSD, USDCAD, EURGBP, NZDCAD, EURAUD
-- Tactic: T_EMA (EMA20 vs EMA200 + ADX>20 on H1)
-- Secondary: C_RSI_BB, C_Sweep (only when ADX<20, range conditions)
+- Tactics (per regime, per constitution §8):
+  TREND: Trend Pullback, London Breakout, NY Macro Continuation
+  RANGE: Range Mean Reversion, RSI+BB Reversion
+  REVERSAL: Liquidity Sweep (confluence ≥ 5)
 - NO JPY pairs, NO XAUUSD (unviable with averaging on $100K equity)
 - NO mixing regimes. NO switching without new backtest.
 
@@ -75,7 +78,7 @@ stable/reproducible > profit. Conflict → choose the higher item. Unclear marke
 ## Management with averaging
 - TP hit → all positions close automatically (TP set on all)
 - Per-position SL hit → that position closes, others remain
-- DD stop (1.7%) → close all remaining manually
+- DD stop (2.5%) → close all remaining manually
 - Time stop: if no TP or all-SL in 72 bars (H1 = 3 days) → evaluate, possibly close
 - Friday 19:30 UTC → close all regardless
 - Invalidation (trend broken on H4) → close all
