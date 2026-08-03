@@ -24,10 +24,10 @@ description: "Use when running the autonomous intraday AI trader on MetaTrader5 
 - Max 3 позиции на символ: 1 main + 2 addons
 - Addon 1: -1.0×ATR от main entry
 - Addon 2: -2.0×ATR от main entry
-- Каждая позиция: свой SL = 1.5×ATR от своего entry
+- Каждая позиция: свой SL = 2.5×ATR от своего entry
 - TP = weighted_avg + 0.5×ATR (пересчёт после каждого addon)
 - DD stop: суммарный убыток ≥ 2.5% equity → close all
-- Lot = (equity × 2.5%) / (3 × 1.5×ATR × contract)
+- Lot = (equity × 2.5%) / (3 × 2.5×ATR × contract)
 
 ## ⚠️ Два жёстких факта
 1. Крон — в ЛОКАЛЬНОМ времени машины. Машина в UTC.

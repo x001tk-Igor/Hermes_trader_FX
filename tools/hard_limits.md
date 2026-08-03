@@ -16,12 +16,12 @@ stable/reproducible > profit. Conflict → choose the higher item. Unclear marke
 - Max 3 positions per symbol: 1 main + 2 addons
 - Addon 1: at -1.0×ATR from main entry
 - Addon 2: at -2.0×ATR from main entry
-- Each position has its OWN physical SL = 1.5×ATR from its own entry
+- Each position has its OWN physical SL = 2.5×ATR from its own entry
 - SL is NEVER moved, NEVER widened, NEVER removed
 - TP = weighted_average + 0.5×ATR (recalculated after each addon)
 - TP applies to ALL open positions on that symbol simultaneously
 - DD stop: if total unrealized+realized loss on symbol ≥ 2.5% equity → close ALL positions
-- Lot is calculated ONCE for all 3 positions: lot = (equity × 2.5%) / (3 × 1.5×ATR × contract)
+- Lot is calculated ONCE for all 3 positions: lot = (equity × 2.5%) / (3 × 2.5×ATR × contract)
 - If calculated lot < 0.01 → SKIP (too risky for equity size)
 - If ATR > 5% of price → SKIP (anomaly/gap protection)
 

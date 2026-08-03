@@ -52,7 +52,7 @@ def cmd_avg_size(args):
     lot = (equity × max_loss_pct/100) / (3 × 1.5 × ATR × contract)
     """
     max_positions = 3  # 1 main + 2 addons
-    sl_atr_mult = 1.5
+    sl_atr_mult = 2.5
     max_loss_usd = args.equity * (args.max_loss_pct / 100.0)
     sl_dist = sl_atr_mult * args.atr
     denom = max_positions * sl_dist * args.contract_size

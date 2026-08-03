@@ -38,7 +38,7 @@ For EACH symbol in xau_env.REGIMES:
 ```
 py -3 position_size.py --avg-mode --equity E --max-loss-pct 2.5 --atr A --contract-size C
 ```
-- lot = (equity × 2.5%) / (3 × 1.5×ATR × contract)
+- lot = (equity × 2.5%) / (3 × 2.5×ATR × contract)
 - If lot < 0.01 → SKIP (too risky for equity).
 - Record lot for all 3 potential positions.
 

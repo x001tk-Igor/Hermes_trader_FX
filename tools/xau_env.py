@@ -42,7 +42,7 @@ AVERAGING = {
     "max_addons": 2,              # max 3 positions total (1 main + 2 addons)
     "addon1_atr_mult": 1.0,      # first addon at -1.0×ATR from entry
     "addon2_atr_mult": 2.0,      # second addon at -2.0×ATR from entry
-    "sl_atr_mult": 1.5,          # each position SL = 1.5×ATR from its own entry
+    "sl_atr_mult": 2.5,          # each position SL = 2.5×ATR from its own entry (room for addons)
     "tp_atr_mult": 0.5,          # TP = weighted_avg + 0.5×ATR
     "dd_stop_pct": 2.5,          # close all if total loss ≥ 2.5% equity (room before 3% daily)
     "max_positions_per_symbol": 3,
