@@ -20,8 +20,8 @@ EXE = os.environ.get("MT5_TERMINAL_PATH", r"C:\Program Files\RoboForex MT5 Termi
 # v3 instruments
 INSTRUMENTS = ["EURUSD", "GBPUSD", "USDCAD", "EURGBP", "NZDCAD", "EURAUD"]
 REGIMES = {s: "TREND" for s in INSTRUMENTS}
-WIN_START = {s: 6 for s in INSTRUMENTS}
-WIN_END = {s: 22 for s in INSTRUMENTS}
+WIN_START = {s: 5 for s in INSTRUMENTS}
+WIN_END = {s: 20 for s in INSTRUMENTS}
 CONTRACT = {s: 100000 for s in INSTRUMENTS}
 DIGITS = {s: 5 for s in INSTRUMENTS}
 

@@ -103,7 +103,7 @@ if __name__ == "__main__":
     while True:
         now = datetime.datetime.now(datetime.timezone.utc)
         
-        if 6 <= now.hour <= 21 and now.weekday() < 5:
+        if 5 <= now.hour <= 19 and now.weekday() < 5:
             try:
                 run_dd_check()
             except Exception as e:

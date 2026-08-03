@@ -25,12 +25,12 @@ REGIMES = {
 
 # Per-instrument metadata
 INSTRUMENT_INFO = {
-    "EURUSD": {"digits": 5, "contract": 100000, "window": (6, 0, 22, 0)},
-    "GBPUSD": {"digits": 5, "contract": 100000, "window": (6, 0, 22, 0)},
-    "USDCAD": {"digits": 5, "contract": 100000, "window": (6, 0, 22, 0)},
-    "EURGBP": {"digits": 5, "contract": 100000, "window": (6, 0, 22, 0)},
-    "NZDCAD": {"digits": 5, "contract": 100000, "window": (6, 0, 22, 0)},
-    "EURAUD": {"digits": 5, "contract": 100000, "window": (6, 0, 22, 0)},
+    "EURUSD": {"digits": 5, "contract": 100000, "window": (5, 0, 20, 0)},
+    "GBPUSD": {"digits": 5, "contract": 100000, "window": (5, 0, 20, 0)},
+    "USDCAD": {"digits": 5, "contract": 100000, "window": (5, 0, 20, 0)},
+    "EURGBP": {"digits": 5, "contract": 100000, "window": (5, 0, 20, 0)},
+    "NZDCAD": {"digits": 5, "contract": 100000, "window": (5, 0, 20, 0)},
+    "EURAUD": {"digits": 5, "contract": 100000, "window": (5, 0, 20, 0)},
 }
 
 # Active tactics (T_EMA = primary, C_RSI_BB/C_Sweep = secondary for range conditions)
