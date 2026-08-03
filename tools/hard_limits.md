@@ -40,6 +40,7 @@ stable/reproducible > profit. Conflict → choose the higher item. Unclear marke
 - DD from equity peak: 5% → stop + close + alert
 - Max 8 new entries per day (across all 6 pairs)
 - Max 1 active averaging group per symbol (3 positions max)
+- Max 3 instruments with open positions simultaneously (excluding addons)
 - Max 6 symbols traded simultaneously
 
 ## Time (UTC)

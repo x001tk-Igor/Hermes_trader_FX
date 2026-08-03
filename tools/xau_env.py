@@ -60,6 +60,7 @@ DD_WARN4 = 0.04
 DD_HALT5 = 0.05
 MAX_NEW_TRADES_DAY = 8         # 8 entries across 6 pairs (was 4 for single pair)
 MAX_SYMBOLS_TRADED = 6
+MAX_INSTRUMENTS_OPEN = 3  # max instruments with open positions (excluding addons)
 
 # ── Trading window (UTC) ─────────────────────────────────────────────
 # All FX pairs: 06:00-22:00 UTC
