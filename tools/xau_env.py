@@ -46,7 +46,7 @@ AVERAGING = {
     "tp_atr_mult": 0.5,          # TP = weighted_avg + 0.5×ATR
     "dd_stop_pct": 2.5,          # close all if total loss ≥ 2.5% equity (room before 3% daily)
     "max_positions_per_symbol": 3,
-    "lot_round": 0.01,           # round down to 0.01
+    "lot_divisor": 2,            # divide calculated lot by 2 for safety (8 pos max)
     "atr_anomaly_pct": 5.0,      # skip if ATR > 5% of price (gap protection)
 }
 

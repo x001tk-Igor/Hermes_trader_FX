@@ -60,7 +60,9 @@ def cmd_avg_size(args):
         print("INVALID: ATR or contract size <= 0"); return
     
     raw_lot = max_loss_usd / denom
-    lot = _floor_lot(raw_lot, args.lot_step)
+    lot = max(math.floor(raw_lot * 100) / 100, 0.01)
+    # v3.2: divide by 2 for safety (multiple instruments open simultaneously)
+    lot = max(math.floor(lot / 2 * 100) / 100, 0.01)
     
     # Actual max loss if all 3 SLs hit
     actual_max_loss = max_positions * lot * sl_dist * args.contract_size
