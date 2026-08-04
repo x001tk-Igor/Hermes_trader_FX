@@ -249,11 +249,11 @@ def main():
                 print(f"[{now:%H:%M:%S}] {a}", flush=True)
                 send_tg(f"DD STOP: {a}")
             
-            # 2. Price level alerts
+            # 2. Price level alerts (stdout only — for agent, NOT Telegram)
             price_alerts = check_price_levels(all_pos, equity, prev_prices, cfg)
             for a in price_alerts:
                 print(f"[{now:%H:%M:%S}] {a}", flush=True)
-                send_tg(a)
+                # NO Telegram for price alerts — these are for the agent only
             
             # 3. Addon ready alerts
             addon_alerts = check_addon_ready(all_pos, equity, prev_addon_checked)
