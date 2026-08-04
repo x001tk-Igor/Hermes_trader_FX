@@ -12,7 +12,7 @@ Set-Location $workDir
 # Run gate check
 $gateOutput = & $python tools\state.py gate 2>&1 | Out-String
 
-# Wake Hermes agent with full cycle instruction
+# Wake Hermes agent with full cycle instruction, max 5 turns, timeout 8 min
 $prompt = @"
 Торговый цикл. Выполни ПОЛНЫЙ цикл по loop.md (7 шагов, не пропускать):
 1. Gate (результат ниже)
@@ -28,4 +28,4 @@ $gateOutput
 Помни: НЕТ СДЕЛКИ БЕЗ ПОЛНОГО АНАЛИЗА.
 "@
 
-& $hermes chat -q $prompt 2>&1 | Out-Null
+& $hermes chat -q $prompt --max-turns 10 --yolo 2>&1 | Out-Null
