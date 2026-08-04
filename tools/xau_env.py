@@ -33,8 +33,12 @@ INSTRUMENT_INFO = {
     "EURAUD": {"digits": 5, "contract": 100000, "window": (5, 0, 20, 0)},
 }
 
-# Active tactics (T_EMA = primary, C_RSI_BB/C_Sweep = secondary for range conditions)
-TREND_TACTICS = ("T_EMA",)  # EMA20 vs EMA200 + ADX>20
+# Active tactics (v4: 10 primary + 2 reserve, all backtested H1)
+# See hard_limits.md for full tactic list and backtest results
+TREND_TACTICS = ("C1_TrendPullback", "S1_EMA_VWAP", "S2_GoldScalper", "S3_200EMA_UTBot", "S4_MadCharts", "S8_SmartTrend")
+RANGE_TACTICS = ("C2_RangeReversion", "C3_RSI_BB")
+BREAKOUT_TACTICS = ("S7_GateBreaker", "S6_NY_ORB")
+REVERSAL_TACTICS = ("C4_LiquiditySweep", "S5_UTBot_STC")
 COUNTER_TACTICS = ("C_RSI_BB", "C_Sweep")  # secondary, only when ADX<20
 
 # ── Averaging configuration ───────────────────────────────────────────

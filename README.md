@@ -1,7 +1,7 @@
-# Hermes Trader FX — Autonomous MT5 Trading System v3
+# Hermes Trader FX — Autonomous MT5 Trading System v4
 
 Autonomous AI trader for MetaTrader5, running as a Hermes Agent skill.
-Trades 6 FX pairs with a 3-position averaging-down system and T_EMA trend signals.
+Trades 6 FX pairs with a 3-position averaging-down system and 10 primary tactics (all backtested).
 
 ## Quick Start
 
@@ -27,136 +27,138 @@ py -3 skills/xau-ai-trader/tools/state.py gate
 py -3 skills/xau-ai-trader/tools/state.py market
 ```
 
-## Instruments (v3 — 6 FX pairs, all TREND)
+## Instruments (v4 — 6 FX pairs only, NO XAUUSD)
 
-Selected by cross-pair backtest study (30 instruments, 5 tactics, 1 year H1).
-All pairs trade in TREND regime with averaging-down.
+| Pair | Contract | Window UTC |
+|------|----------|------------|
+| EURUSD | 100,000 | 05:00-20:00 |
+| GBPUSD | 100,000 | 05:00-20:00 |
+| USDCAD | 100,000 | 05:00-20:00 |
+| EURGBP | 100,000 | 05:00-20:00 |
+| NZDCAD | 100,000 | 05:00-20:00 |
+| EURAUD | 100,000 | 05:00-20:00 |
 
-| Instrument | Regime | Window UTC | Digits | Contract | PF (avg) | WR |
-|---|---|---|---|---|---|---|
-| EURUSD | TREND | 06:00–22:00 | 5 | 100,000 | 1.81 | 82.6% |
-| GBPUSD | TREND | 06:00–22:00 | 5 | 100,000 | 1.77 | 82.5% |
-| USDCAD | TREND | 06:00–22:00 | 5 | 100,000 | 1.69 | 83.1% |
-| EURGBP | TREND | 06:00–22:00 | 5 | 100,000 | 1.63 | 82.2% |
-| NZDCAD | TREND | 06:00–22:00 | 5 | 100,000 | 1.60 | 82.2% |
-| EURAUD | TREND | 06:00–22:00 | 5 | 100,000 | 1.57 | 81.5% |
+**XAUUSD permanently excluded** — averaging-down is unprofitable on gold (all 12 strategies tested, all lose with averaging).
 
-**Excluded:** JPY pairs (unviable on $100K equity — min lot too risky),
-XAUUSD (PF 0.94 with averaging).
+## Averaging-Down System
 
-## Averaging-Down System (v3)
+- Max 3 positions per symbol: 1 main + 2 addons
+- Addon 1 at -1.0xATR, Addon 2 at -2.0xATR from main entry
+- Each position: own SL = 2.5xATR from its own entry
+- TP = weighted_average + 0.5xATR (recalculated after each addon)
+- DD stop: total loss >= 2.5% equity per symbol -> close all
+- Lot = (equity x 2.5%) / (3 x 2.5xATR x contract) / 2 (safety divisor)
+- Max 3 instruments open simultaneously (excluding addons)
+- Daily loss limit: 3% | Weekly: 5% | Max DD: 5%
 
-Each trade uses up to 3 positions with automatic averaging:
+## Tactic Arsenal (10 primary + 2 reserve, all backtested H1)
 
-1. **Main entry:** lot sized for 3 positions, SL = 1.5×ATR
-2. **Addon 1:** at -1.0×ATR from entry, own SL = 1.5×ATR
-3. **Addon 2:** at -2.0×ATR from entry, own SL = 1.5×ATR
-4. **TP** = weighted average + 0.5×ATR (recalculated after each addon)
-5. **DD stop:** if total loss on symbol ≥ 1.7% equity → close all positions
+### TREND (4 primary)
+| # | Tactic | Source | Trigger | PF | PnL |
+|---|--------|--------|---------|-----|-----|
+| C1 | Trend Pullback | Constitution | EMA20>EMA200, pullback to EMA20, trigger candle | 2.67 | +$144K |
+| S1 | EMA 9 + VWAP | TradingView | EMA9 crosses session VWAP | 2.63 | +$120K |
+| S2 | Gold Scalper | TradingView | EMA9/18 trend + RSI pullback / momentum breakout | 2.68 | +$107K |
+| S3 | 200 EMA + UT Bot + ADX | TradingView | HTF 200 EMA + UT Bot flip + ADX>25 (3-layer) | 2.60 | +$46K |
 
-**Lot calculation:**
-```
-lot = (equity × 1.7%) / (3 × 1.5 × ATR × contract_size)
-```
+### SESSION BREAKOUT (2 primary)
+| # | Tactic | Source | Trigger | PF | PnL |
+|---|--------|--------|---------|-----|-----|
+| S7 | Gate Breaker | TradingView | Tokyo range -> London body break | 3.71 | +$121K |
+| S6 | NY ORB | TradingView | 13:00-14:00 UTC OR + breakout + volume + compression | 3.73 | +$65K |
 
-**Tactic: T_EMA** — EMA20 vs EMA200 on H1 + ADX(14) > 20.
-- EMA20 > EMA200 → long bias
-- EMA20 < EMA200 → short bias
-- ADX < 20 → no signal (range — secondary tactics C_RSI_BB/C_Sweep apply)
+### RANGE / MEAN REVERSION (1 primary + 1 reserve)
+| # | Tactic | Source | Trigger | PF | PnL |
+|---|--------|--------|---------|-----|-----|
+| C2 | Range Reversion | Constitution | ADX<20, 2+ boundary tests, rejection candle | 11.45 | +$36K |
+| C3 | RSI + BB (reserve) | Constitution | Close beyond BB(20,2) + RSI extreme + RSI turn | inf | +$6.8K |
 
-## Risk Management
+### TREND ENHANCED (2 primary)
+| # | Tactic | Source | Trigger | PF | PnL |
+|---|--------|--------|---------|-----|-----|
+| S4 | MadCharts Baseline | TradingView | 50 EMA/SMA area + 9/18 EMA + close above fast EMAs | 3.17 | +$43K |
+| S8 | Smart Trend | TradingView | EMA trend + ADX rising + BOS (5-bar high break) | 2.35 | +$43K |
 
-- Max total loss per symbol (3×SL): **1.7% equity**
-- Daily loss limit: **3.0%** → halt new trades
-- Weekly loss limit: **5.0%** → halt to end of week
-- Max drawdown: **5.0%** → stop + close all + alert
-- Max 8 new entries per day (across all 6 pairs)
-- Max 3 positions per symbol, max 6 symbols simultaneously
-- Friday: no new entries after 19:00 UTC, close all by 19:30 UTC
-- Mandatory per-position Stop Loss (never removed, never widened)
-- ATR anomaly cap: skip if ATR > 5% of price (gap protection)
+### REVERSAL (2 reserve)
+| # | Tactic | Source | Trigger | PF | PnL |
+|---|--------|--------|---------|-----|-----|
+| C4 | Liquidity Sweep (reserve) | Constitution | False breakout PDH/PDL + 13 EMA cross + 3-candle confirm | inf | +$2.6K |
+| S5 | UT Bot + STC (reserve) | TradingView | UT Bot flip + STC extreme + 5-layer guard stack | 6.22 | +$30K |
+
+## Backtest Results (H1, 1 year, 6 FX pairs, averaging mode)
+
+All 12 tactics profitable with averaging on FX. All lose without averaging.
+All lose on XAUUSD with averaging. XAUUSD excluded.
+
+| Tactic | EURUSD | GBPUSD | USDCAD | EURGBP | NZDCAD | EURAUD | Total |
+|--------|--------|--------|--------|--------|--------|--------|-------|
+| C1 TrendPullback | +$17K | +$23K | +$23K | +$56K | +$17K | +$8K | +$144K |
+| S7 GateBreaker | +$19K | +$29K | +$21K | +$26K | +$10K | +$18K | +$121K |
+| S1 EMA_VWAP | +$21K | +$25K | +$12K | +$29K | +$8K | +$4K | +$120K |
+| S2 GoldScalper | +$7K | +$19K | +$29K | +$30K | +$12K | +$12K | +$107K |
+| S6 NY_ORB | +$11K | +$11K | +$15K | +$7K | +$5K | +$6K | +$65K |
+| S3 200EMA_UTBot | +$8K | +$8K | +$9K | +$14K | +$2K | +$5K | +$46K |
+| S4 MadCharts | +$5K | +$6K | +$6K | +$21K | +$2K | +$2K | +$43K |
+| S8 SmartTrend | +$9K | +$4K | +$7K | +$11K | +$4K | +$9K | +$43K |
+| S5 UTBot_STC | +$9K | +$3K | +$6K | +$6K | +$5K | +$1K | +$30K |
+| C2 RangeReversion | +$2K | +$5K | +$8K | +$13K | +$5K | +$2K | +$36K |
+
+## 7-Step Mandatory Cycle (no step may be skipped)
+
+1. **Gate** — `state.py gate` (hard limits, daily loss, DD, positions)
+2. **News** — `calendar.py symbols` (blackout check, 6 currencies)
+3. **Macro + Bias** — `state.py market` + DXY/yields/risk/session + bias per pair
+4. **Regime** — TREND/RANGE/BREAKOUT/UNCLEAR per pair (agent analysis)
+5. **Setup** — specific tactic match (not "EMA cross = enter")
+6. **Confluence + EV** — 6-factor score >= 4/6, EV >= +0.25R
+7. **Execute** — only if ALL steps pass. Journal + Telegram.
+
+**"No trade" is a valid decision.** Better to skip 10 cycles than open one blind trade.
 
 ## Architecture
 
 ```
 xau-ai-trader/
-├── SKILL.md                 # Main skill: triggers, pairs, averaging, schedule
-├── .env.example             # Template for secrets (copy to .env)
+├── SKILL.md              # v4 skill description + 7-step cycle
+├── README.md             # this file
+├── .env.example          # template (real .env is gitignored)
 ├── .gitignore
+├── constitution/
+│   └── Qwen_markdown_Ai_trader_XAU.md  # full trading constitution
 ├── tools/
-│   ├── xau_env.py           # Config: 6 pairs, AVERAGING, risk limits, currency map
-│   ├── state.py             # Gate + positions + avg-positions + avg-risk + dd-monitor + market
-│   ├── trade.py             # MT5 execution: open/close/sltp/avg-tp/close-symbol
-│   ├── position_size.py     # Lot calculator: fixed mode + --avg-mode (3 positions)
-│   ├── calendar.py          # Economic calendar: 6 currencies, symbol mapping, blackouts
-│   ├── journal.py           # Trade journal with averaging fields (addon_number, avg_group)
-│   ├── alert_sensor.py      # Background price level monitor → Telegram alerts
-│   ├── tg_notify.py         # Telegram notifications
-│   ├── cycle_multi.py       # Multi-instrument scanner (legacy)
-│   ├── hard_limits.md       # Quick reference: all limits + averaging rules
-│   ├── decide_template.md   # Pre-trade decision checklist
-│   ├── loop.md              # Operational cycle v3 (addon management, DD check)
-│   ├── env.md               # Environment reference
-│   ├── cron_template.txt    # Cron job recreation templates
-│   ├── backtest_tactics.py  # 10-tactic backtest engine
-│   ├── sim_averaging.py     # Averaging-down simulator v1
-│   ├── sim_averaging_v2.py  # v2: per-position SL + DD stop
-│   ├── cross_pair_study.py  # 30-instrument cross-pair study
-│   └── sim_acceleration.py  # Position Acceleration simulator (research)
-├── constitution/            # Trading rules (source of truth)
-│   └── Qwen_markdown_Ai_trader_XAU.md  # Full trading constitution
-└── journal/                 # Runtime data (gitignored)
-    └── trades.csv           # Trade log (generated at runtime)
+│   ├── auto_cycle.py     # DD MONITOR ONLY (no trading decisions)
+│   ├── state.py          # gate, positions, market, dd-monitor, avg-positions, avg-risk
+│   ├── trade.py          # open, close, close-symbol, sltp, avg-tp
+│   ├── position_size.py  # lot calc with --avg-mode + lot halving
+│   ├── calendar.py       # economic calendar (6 currencies, symbol mapping)
+│   ├── journal.py        # trade journal with averaging fields
+│   ├── xau_env.py        # config: 6 pairs, AVERAGING_CONFIG, windows
+│   ├── hard_limits.md    # v4 risk limits + full tactic list
+│   ├── loop.md           # 7-step cycle playbook
+│   ├── env.md            # environment setup guide
+│   ├── cron_template.txt # cron schedule template
+│   ├── wake_cycle.ps1    # Task Scheduler wake script (hourly)
+│   ├── backtest_tactics.py      # original 10-tactic backtest engine
+│   ├── tv_backtest_h1.py        # 9 TradingView strategies H1 screening
+│   ├── tv_backtest_m15.py       # 8 TradingView strategies M15 detailed
+│   ├── constitution_backtest_h1.py  # 4 constitution tactics H1
+│   ├── sim_averaging.py         # averaging simulator v1
+│   ├── sim_averaging_v2.py      # averaging simulator v2 (per-pos SL + DD)
+│   ├── sim_acceleration.py      # Position Acceleration research (rejected)
+│   ├── cross_pair_study.py      # 30-instrument study
+│   └── tg_notify.py             # Telegram notification helper
 ```
 
-## Operational Cycle (v3)
+## Key Design Decisions
 
-1. **Trading cycle** (06:01–21:46 UTC, every 15 min):
-   - `state.py gate` — hard-limit check
-   - `calendar.py symbols` — news blackout check
-   - `state.py market` — bid/ask/spread/EMA/ADX/ATR for all 6 pairs
-   - T_EMA signal scan → `position_size.py --avg-mode` → `trade.py open`
-   - `state.py avg-positions` + `avg-risk` — addon management + DD check
-   - `trade.py avg-tp` — recalculate TP after addon
-   - `trade.py close-symbol` — if DD stop triggered
-   - `journal.py add` — log all actions
-2. **Pre-market** (05:50 UTC): macro scan, calendar, bias formation.
-3. **Daily report** (22:33 UTC): close positions, stats, daily summary.
-
-## Backtest Results (2026-08-02, H1, 1 year, $100K equity)
-
-| Method | Total PnL | PF | WR | Worst Trade |
-|---|---|---|---|---|
-| Fixed 0.01 | -$181,976 | 0.00 | 0% | -$382 |
-| **Averaging Down v3** | **+$764,790** | **1.50-1.78** | **81-83%** | **-$2,006** |
-| Position Acceleration ×8 | -$195,787 | 0.00 | 0% | -$386 |
-| Accel Multi-step | -$159,183 | 0.03-0.23 | 1-5% | -$374 |
-
-Averaging down is the only profitable method on intraday FX with T_EMA.
-
-## Configuration
-
-All secrets in `.env` (see `.env.example`):
-- `MT5_TERMINAL_PATH` — path to terminal64.exe
-- `MT5_LOGIN` — account number
-- `MT5_SERVER` — broker server name
-- `TELEGRAM_BOT_TOKEN` — bot token from @BotFather
-- `TELEGRAM_CHAT_ID` — destination chat ID
-- `TELEGRAM_PROXY` — HTTP proxy if Telegram API is blocked
-
-Instrument settings (contract size, digits, spread limits, averaging config)
-in `tools/xau_env.py`. Adjust for your broker if different.
-
-## Deploying on Another Machine
-
-1. Install MetaTrader5 terminal, log in to your account
-2. `pip install MetaTrader5`
-3. Clone this repo
-4. Copy `.env.example` → `.env`, fill in your values
-5. Set `MT5_TERMINAL_PATH` to your terminal64.exe path
-6. Run `py -3 tools/state.py gate` to verify connection
-7. Start the agent — it will load the skill and begin trading
+1. **Averaging-down, not Position Acceleration** — tested both, averaging wins on H1 FX (87% recovery rate)
+2. **XAUUSD excluded** — averaging kills on gold (all 12 strategies unprofitable)
+3. **Lot halved (/2)** — multiple instruments open = total risk must stay < 4%
+4. **auto_cycle.py = DD MONITOR ONLY** — agent does ALL analysis, script only protects against drawdown
+5. **7-step mandatory cycle** — no trade without full analysis (gate -> news -> macro -> regime -> setup -> confluence -> EV -> execute)
+6. **Max 3 instruments simultaneously** — portfolio risk management
+7. **H1 timeframe** — better than M15 for most strategies (M15 tested, H1 wins)
 
 ## License
 
-Private project. Not for redistribution.
+Personal use. Not financial advice. Trade at your own risk.

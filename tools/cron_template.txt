@@ -1,32 +1,18 @@
-# Self-heal: recreate the FX-trader durable crons (machine TZ = UTC)
-# v3 — 6 FX pairs, averaging system
-# Use if CronList shows them missing or near 7-day expiry. All durable:true, recurring.
+# Self-heal: recreate the FX-trader Task Scheduler task
+# v4 — 6 FX pairs, averaging system, 05:00-20:00 UTC window
+# auto_cycle.py = DD MONITOR ONLY, Task Scheduler wakes agent hourly
 #
-# cycle  (06:01-21:46 UTC):   cron "1,16,31,46 6-21 * * 1-5"  — runs 1 min AFTER M15 bar close
-# pre-market (05:50 UTC):     cron "50 5 * * 1-5"
-# daily report (22:33 UTC):   cron "33 22 * * 1-5"
-
-# === cycle prompt ===
-Автономный цикл FX трейдера (6 пар с усреднением, EURUSD/GBPUSD/USDCAD/EURGBP/NZDCAD/EURAUD).
-СНАЧАЛА resume-шаг 0: py -3 ./tools/state.py gate.
-Если NEW_TRADES_OK — выполни цикл по loop.md:
-1. state.py market для каждой пары
-2. T_EMA signal (EMA20 vs EMA200 + ADX>20 на H1)
-3. position_size.py --avg-mode для sizing
-4. trade.py open для новых сигналов
-5. state.py avg-positions + avg-risk для существующих (addon check, DD check)
-6. trade.py avg-tp после addon
-7. trade.py close-symbol если DD stop
-8. journal.py add для всех действий
-trade.py --terminal "C:/Program Files/RoboForex MT5 Terminal/terminal64.exe".
-Без болтовни.
-
-# === pre-market prompt (05:50 UTC) ===
-Pre-market скан: state.py gate + calendar.py today + state.py market для всех 6 пар.
-DXY/US10Y через web. Bias + план. journal.py add action=PREMARKET.
-Self-heal: CronList — если кроны пропали, пересоздай.
-
-# === daily report prompt (22:33 UTC) ===
-Daily report: state.py positions — если есть открытые и окно закрыто, закрой все.
-state.py dd-monitor. journal.py stats. Полный дневной отчёт по всем парам.
-tg_notify.
+# Task: HermesTraderCycle, hourly 05:00-20:00 UTC
+# Script: tools/wake_cycle.ps1 (runs gate + wakes Hermes agent)
+#
+# PowerShell recreate command:
+# Unregister-ScheduledTask -TaskName 'HermesTraderCycle' -Confirm:$false -ErrorAction SilentlyContinue
+# $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-ExecutionPolicy Bypass -File "C:\Users\USER\.claude\skills\xau-ai-trader\tools\wake_cycle.ps1"'
+# $trigger = @(); for ($h = 5; $h -le 20; $h++) { $t = '{0:D2}:00' -f $h; $trigger += New-ScheduledTaskTrigger -Daily -At $t }
+# $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 10)
+# Register-ScheduledTask -TaskName 'HermesTraderCycle' -Action $action -Trigger $trigger -Settings $settings -Force
+#
+# DD monitor (background process, always running):
+# cd ~/.claude/skills/xau-ai-trader && py -3 tools/auto_cycle.py &
+# Checks DD stop 2.5% every 5 minutes, 05:00-20:00 UTC, Mon-Fri
+# Does NOT open positions, does NOT open addons. Only DD protection + Telegram alerts.

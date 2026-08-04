@@ -1,6 +1,6 @@
 ---
 name: xau-ai-trader
-description: "Use when running the autonomous intraday AI trader on MetaTrader5 — the recurring cron trade cycle during the 06:00–22:00 UTC window, or when the user asks to run a trade cycle / check the trader / manage open positions. v4: 6 FX pairs (EURUSD, GBPUSD, USDCAD, EURGBP, NZDCAD, EURAUD), all TREND regime, averaging-down system (3 positions per symbol). Full constitution-compliant cycle: limits → news → macro/bias → regime → setup → confluence/EV → execute. T_EMA/trend pullback/London breakout/NY macro/range reversion/liquidity sweep tactics. Risk: 2.5% max per symbol with averaging, 3% daily, 5% weekly, 5% max DD. Max 3 instruments open simultaneously. Executed via trade.py with --terminal."
+description: "Use when running the autonomous intraday AI trader on MetaTrader5 — the recurring trade cycle during the 05:00–20:00 UTC window, or when the user asks to run a trade cycle / check the trader / manage open positions. v4: 6 FX pairs (EURUSD, GBPUSD, USDCAD, EURGBP, NZDCAD, EURAUD), NO XAUUSD, averaging-down system (3 positions per symbol). 10 primary + 2 reserve tactics (all backtested H1). Full 7-step cycle: limits → news → macro/bias → regime → setup → confluence/EV → execute. Risk: 2.5% max per symbol with averaging, 3% daily, 5% weekly, 5% max DD. Max 3 instruments open simultaneously. Lot halved /2. auto_cycle.py = DD MONITOR ONLY. Executed via trade.py with --terminal."
 ---
 
 # xau-ai-trader — автономный ИИ-трейдер FX (v4)
