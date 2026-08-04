@@ -1,19 +1,38 @@
-# Hard limits digest (v4 — averaging + full constitution cycle, 6 FX pairs)
+# Hard limits digest (v4 — 10 tactics, 6 FX pairs, NO XAUUSD)
 
 ## Hierarchy (§1)
 Capital preservation > risk limits > execution/costs > +EV after costs >
 stable/reproducible > profit. Conflict → choose the higher item. Unclear market → no trade.
 **No trade without full 7-step analysis (limits→news→macro→regime→setup→confluence→EV).**
 
-## Instruments & regime (v4 — backtest 2026-08-02)
-- 6 FX pairs, ALL TREND regime (with averaging):
-  EURUSD, GBPUSD, USDCAD, EURGBP, NZDCAD, EURAUD
-- Tactics (per regime, per constitution §8):
-  TREND: Trend Pullback, London Breakout, NY Macro Continuation
-  RANGE: Range Mean Reversion, RSI+BB Reversion
-  REVERSAL: Liquidity Sweep (confluence ≥ 5)
-- NO JPY pairs, NO XAUUSD (unviable with averaging on $100K equity)
-- NO mixing regimes. NO switching without new backtest.
+## Instruments (v4 — 6 FX pairs only, NO XAUUSD)
+- EURUSD, GBPUSD, USDCAD, EURGBP, NZDCAD, EURAUD
+- XAUUSD EXCLUDED — averaging kills on gold (all strategies unprofitable)
+- NO JPY pairs (unviable at $100K equity)
+
+## Tactics (10 primary + 2 reserve, all backtested H1 with averaging)
+
+### TREND (4 tactics)
+1. **C1 Trend Pullback** [Constitution] — EMA20>EMA200, pullback to EMA20, trigger candle. PF 2.67, +$144K
+2. **S1 EMA_VWAP** [TradingView] — EMA9 crosses session VWAP. PF 2.63, +$120K
+3. **S2 GoldScalper** [TradingView] — EMA9/18 trend + RSI pullback / momentum breakout. PF 2.68, +$107K
+4. **S3 200EMA_UTBot** [TradingView] — HTF 200 EMA + UT Bot flip + ADX>25. PF 2.60, +$46K
+
+### SESSION BREAKOUT (2 tactics)
+5. **S7 GateBreaker** [TradingView] — Tokyo range → London body break. PF 3.71, +$121K
+6. **S6 NY_ORB** [TradingView] — 13:00-14:00 UTC OR + breakout + volume + compression. PF 3.73, +$65K
+
+### RANGE / MEAN REVERSION (2 tactics)
+7. **C2 Range Reversion** [Constitution] — ADX<20, 2+ boundary tests, rejection candle. PF 11.45, +$36K
+8. **C3 RSI+BB** [Constitution, RESERVE] — close beyond BB(20,2) + RSI extreme. 98.8% WR, +$6.8K (few trades)
+
+### TREND ENHANCED (2 tactics)
+9. **S4 MadCharts** [TradingView] — 50 EMA/SMA baseline + 9/18 EMA confirmation. PF 3.17, +$43K
+10. **S8 SmartTrend** [TradingView] — BOS + ADX rising + EMA trend. PF 2.35, +$43K
+
+### REVERSAL (1 tactic)
+11. **C4 Liquidity Sweep** [Constitution, RESERVE] — false breakout PDH/PDL + 13 EMA cross. +$2.6K (marginal, 4/6 pairs)
+12. **S5 UTBot_STC** [TradingView] — UT Bot + STC + 5-layer guard stack. PF 6.22, +$30K
 
 ## Averaging rules (v3 — replaces old "no averaging" ban)
 - Max 3 positions per symbol: 1 main + 2 addons
