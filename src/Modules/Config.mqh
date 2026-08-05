@@ -123,6 +123,63 @@ input int    S7_LondonEndHourUTC    = 16;
 input bool   S7_BodyBreakRequired   = true;
 input bool   S7_OneEntryPerDay      = true;
 
+
+input group "=== C3 RSI + Bollinger ==="
+input int    C3_BB_Period           = 20;
+input double C3_BB_Std              = 2.0;
+input int    C3_AdxMax              = 20;
+input double C3_RsiLongMax          = 35.0;
+input double C3_RsiShortMin         = 65.0;
+
+input group "=== C4 Liquidity Sweep ==="
+input int    C4_SweepLookback       = 24;      // баров назад для экстремума (PDH/PDL)
+input int    C4_EmaTrigger          = 13;
+input int    C4_ConfirmCandles      = 3;
+input int    C4_ConfirmMinSameDir   = 2;
+
+input group "=== S1 EMA x VWAP ==="
+input int    S1_EmaPeriod           = 9;
+input int    S1_VwapStartHourUTC    = 0;
+
+input group "=== S2 Dual Mode ==="
+input int    S2_EmaFast             = 9;
+input int    S2_EmaSlow             = 18;
+input double S2_RsiLongThreshold    = 40.0;
+input double S2_RsiShortThreshold   = 60.0;
+input int    S2_BreakoutLookback    = 20;
+input bool   S2_ModeA_RsiPullback   = true;    // режим A: откат по RSI
+input bool   S2_ModeB_Breakout      = true;    // режим B: пробой экстремума
+
+input group "=== S3 200EMA + UT Bot + ADX ==="
+input int    S3_HtfEmaPeriod        = 200;
+input int    S3_UtBotAtrPeriod      = 2;
+input double S3_UtBotAtrMult        = 1.0;
+input int    S3_AdxMin              = 25;
+
+input group "=== S4 MadCharts Baseline ==="
+input int    S4_BaselineEma         = 50;
+input int    S4_BaselineSma         = 50;
+input int    S4_FastEma1            = 9;
+input int    S4_FastEma2            = 18;
+input int    S4_TouchLookback       = 3;
+
+input group "=== S5 UT Bot + STC + Guards ==="
+input int    S5_UtBotAtrPeriod      = 2;
+input double S5_UtBotAtrMult        = 1.0;
+input double S5_RsiLongMax          = 45.0;
+input double S5_RsiShortMin         = 55.0;
+input int    S5_AdxMin              = 20;
+input double S5_CandleRangeMinATR   = 0.3;
+input double S5_CandleRangeMaxATR   = 3.0;
+input double S5_VolumeFilterMult    = 0.8;
+input int    S5_VolumeLookback      = 20;
+
+input group "=== S8 Smart Trend (BOS) ==="
+input int    S8_EmaFast             = 20;
+input int    S8_EmaSlow             = 200;
+input int    S8_AdxMin              = 20;
+input int    S8_BosLookback         = 5;
+
 //=== МОСТ К УПРАВЛЯЮЩЕМУ ===========================================
 // ВАЖНО: в тестере стратегий управляющего НЕТ. Советник обязан
 // работать автономно при отсутствии файлов — иначе оптимизации,
