@@ -16,3 +16,6 @@ alerts.json
 Thumbs.db
 .DS_Store
 nul
+# сборка MQL5 — бинарник и лог не версионируются
+*.ex5
+*.compile.log
