@@ -21,7 +21,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Hermes FX"
 #property link      "https://github.com/x001tk-Igor/Hermes_trader_FX"
-#property version   "1.00"
+#property version   "1.01"
 #property strict
 #property description "Мультитактический советник: 12 тактик, раздельные magic, бюджет риска"
 
@@ -93,7 +93,7 @@ int OnInit()
 
    if(PollSeconds > 0) EventSetTimer(PollSeconds);
 
-   PrintFormat("Hermes FX v1.00 (Ф0) старт | %s | magic база %d | усреднение %s | бюджет риска %s",
+   PrintFormat("Hermes FX v1.01 (Ф2) старт | %s | magic база %d | усреднение %s | бюджет риска %s",
                g_symbol, MagicBase,
                (EnableAveraging ? "ВКЛ" : "выкл"),
                (EnableRiskBudget ? "ВКЛ" : "выкл"));
@@ -389,6 +389,7 @@ void OpenNewBasket(const int i, const Signal &sig)
       //    доливок. Плавающий ATR сделал бы уровни непредсказуемыми.
       g_baskets[i].first_entry  = r.price;
       g_baskets[i].atr_at_entry = g_ctx.atr;
+      g_baskets[i].tp_distance  = sig.tp_distance;
       g_baskets[i].direction    = sig.direction;
       g_baskets[i].addons_done  = 0;
       g_addons_blocked[i]       = false;

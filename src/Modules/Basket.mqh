@@ -38,6 +38,7 @@ struct BasketState
    double      virtual_tp;       // цель корзины (0 = нет корзины)
    double      first_entry;      // цена первого входа — от неё уровни доливок
    double      atr_at_entry;     // ATR на момент открытия: шаг доливок не должен «плыть»
+   double      tp_distance;      // цель ОТ СРЕДНЕЙ, задана тактикой (0 = взять TP_ATR_Mult)
    datetime    opened_at;
    int         bars_held;
 
@@ -53,6 +54,7 @@ struct BasketState
       virtual_tp   = 0.0;
       first_entry  = 0.0;
       atr_at_entry = 0.0;
+      tp_distance  = 0.0;
       opened_at    = 0;
       bars_held    = 0;
    }
@@ -112,7 +114,16 @@ bool RecalcBasket(const string symbol, const int magic, BasketState &st)
    //--- цель от средневзвешенной. ATR берётся тот, что был на входе:
    //    иначе цель «дышит» вместе с рынком и корзина никогда не
    //    закрывается по заранее известному уровню.
-   double tp_dist = st.atr_at_entry * TP_ATR_Mult;
+   //
+   //    ДИСТАНЦИЮ МОЖЕТ ЗАДАТЬ ТАКТИКА. Это не лазейка в слоях, а
+   //    признание того, что у тактик разные естественные цели: у C1
+   //    это множитель ATR, у C2 — середина диапазона, и заставлять
+   //    вторую мерить в ATR значило бы ломать её тезис ради единообразия.
+   //    Тактика задаёт РАССТОЯНИЕ, а не цену: точку отсчёта (среднюю)
+   //    по-прежнему знает только движок, и после доливки цель уезжает
+   //    вместе со средней — то есть усреднение работает как задумано.
+   double tp_dist = (st.tp_distance > 0.0) ? st.tp_distance
+                                           : st.atr_at_entry * TP_ATR_Mult;
    if(tp_dist <= 0.0) { st.virtual_tp = 0.0; return(true); }
 
    st.virtual_tp = (dir == DIR_LONG) ? st.weighted_avg + tp_dist
