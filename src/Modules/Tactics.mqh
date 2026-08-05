@@ -141,3 +141,66 @@ bool EvalTactic(const ENUM_TACTIC t, const BarContext &ctx, CIndicators &ind, Si
    sig.tactic = t;
    return(false);
 }
+
+//==================================================================
+//  ЖИВА ЛИ ГИПОТЕЗА ОТКРЫТОЙ КОРЗИНЫ
+//==================================================================
+
+//+------------------------------------------------------------------+
+//| Вторая половина контракта тактики: сказать, что её тезис умер.    |
+//|                                                                  |
+//| ЗАЧЕМ ЭТО У ТАКТИКИ, А НЕ У ДВИЖКА. В Setura долив прекращался   |
+//| по флипу её собственной EMA — то есть решение принимал мозг       |
+//| советника. У нас мозгов двенадцать, и «разворот» для трендовой    |
+//| тактики и для диапазонной означает противоположные вещи: для C1   |
+//| это пересечение EMA, для C2 — пробой границы диапазона, который   |
+//| для C1 был бы наоборот подтверждением.                            |
+//|                                                                  |
+//| Поэтому движок спрашивает, а отвечает тактика. Движок только      |
+//| исполняет: перестаёт доливать (мягко) или закрывает корзину.      |
+//|                                                                  |
+//| Умолчание — ЖИВА. Тактика, не реализовавшая проверку, не должна   |
+//| молча закрывать свои корзины: это выглядело бы как решение, а     |
+//| было бы отсутствием кода.                                         |
+//+------------------------------------------------------------------+
+enum ENUM_HYPOTHESIS
+{
+   HYP_ALIVE = 0,       // тезис в силе — вести как обычно
+   HYP_NO_ADDONS,       // долив прекратить, открытое вести до цели
+   HYP_CLOSE            // тезис опровергнут — закрыть корзину
+};
+
+ENUM_HYPOTHESIS Hypothesis_C1(const BarContext &ctx, CIndicators &ind, const int direction)
+{
+   return(HYP_ALIVE);   // Ф2
+}
+
+ENUM_HYPOTHESIS Hypothesis_C2(const BarContext &ctx, CIndicators &ind, const int direction)
+{
+   return(HYP_ALIVE);   // Ф2
+}
+
+ENUM_HYPOTHESIS Hypothesis_S6(const BarContext &ctx, CIndicators &ind, const int direction)
+{
+   return(HYP_ALIVE);   // Ф2
+}
+
+ENUM_HYPOTHESIS Hypothesis_S7(const BarContext &ctx, CIndicators &ind, const int direction)
+{
+   return(HYP_ALIVE);   // Ф2
+}
+
+ENUM_HYPOTHESIS EvalHypothesis(const ENUM_TACTIC t, const BarContext &ctx,
+                               CIndicators &ind, const int direction)
+{
+   if(!StopAddonsOnTrendFlip) return(HYP_ALIVE);
+
+   switch(t)
+   {
+      case TACTIC_C1: return(Hypothesis_C1(ctx, ind, direction));
+      case TACTIC_C2: return(Hypothesis_C2(ctx, ind, direction));
+      case TACTIC_S6: return(Hypothesis_S6(ctx, ind, direction));
+      case TACTIC_S7: return(Hypothesis_S7(ctx, ind, direction));
+   }
+   return(HYP_ALIVE);
+}

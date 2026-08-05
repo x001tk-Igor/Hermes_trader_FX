@@ -30,6 +30,7 @@
 #include "Modules/Indicators.mqh"
 #include "Modules/RiskBudget.mqh"
 #include "Modules/Basket.mqh"
+#include "Modules/Execute.mqh"
 #include "Modules/Tactics.mqh"
 #include "Modules/Bridge.mqh"
 
@@ -43,6 +44,9 @@ datetime      g_cooldown_until[TACTIC_COUNT];
 long          g_tick_no       = 0;
 string        g_last_action   = "init";
 string        g_symbol;
+BarContext    g_ctx;                       // контекст закрытого бара, обновляется раз в бар
+bool          ctx_ok          = false;
+bool          g_addons_blocked[TACTIC_COUNT];
 
 //+------------------------------------------------------------------+
 //| Инициализация                                                    |
@@ -77,6 +81,7 @@ int OnInit()
       g_baskets[i].tactic = TacticByIndex(i);
       g_baskets[i].magic  = TacticMagic(TacticByIndex(i));
       g_cooldown_until[i] = 0;
+      g_addons_blocked[i] = false;
    }
 
    g_trade.SetExpertMagicNumber(MagicBase);   // конкретный magic ставится перед каждым приказом
@@ -161,6 +166,7 @@ void ManageBaskets()
             g_baskets[i].first_entry  = 0.0;
             g_baskets[i].addons_done  = 0;
             g_baskets[i].atr_at_entry = 0.0;
+            g_addons_blocked[i]       = false;
             g_cooldown_until[i] = TimeCurrent() + CooldownBars * PeriodSeconds(PERIOD_CURRENT);
          }
          continue;
@@ -209,11 +215,91 @@ void ManageBaskets()
          }
       }
 
-      //--- 4. доливка (Ф1: исполнение)
-      if(EnableAveraging && AddonDue(g_symbol, g_baskets[i]))
+      //--- 4. жива ли гипотеза тактики
+      if(ctx_ok)
       {
-         // исполнение доливки — Ф1
+         ENUM_HYPOTHESIS hyp = EvalHypothesis(g_baskets[i].tactic, g_ctx, g_ind,
+                                              g_baskets[i].direction);
+         if(hyp == HYP_CLOSE)
+         {
+            double pnl = BasketFloatingPnL(g_symbol, g_baskets[i].magic);
+            int n = CloseBasket(g_trade, g_symbol, g_baskets[i].magic);
+            JournalWrite(g_symbol, "HYPOTHESIS_DEAD", tname,
+                         StringFormat("\"closed\":%d,\"pnl\":%.2f", n, pnl));
+            g_last_action = "HYP_DEAD " + tname;
+            continue;
+         }
+         if(hyp == HYP_NO_ADDONS) g_addons_blocked[i] = true;
       }
+
+      //--- 5. трейлинг по средней (по умолчанию выключен)
+      double trail = TrailingStopLevel(g_symbol, g_baskets[i]);
+      if(trail > 0.0)
+      {
+         int moved = MoveBasketStops(g_trade, g_symbol, g_baskets[i].magic,
+                                     trail, g_baskets[i].direction);
+         if(moved > 0)
+            JournalWrite(g_symbol, "TRAIL", tname,
+                         StringFormat("\"moved\":%d,\"sl\":%.5f", moved, trail));
+      }
+
+      //--- 6. доливка
+      if(EnableAveraging && !g_addons_blocked[i] && AddonDue(g_symbol, g_baskets[i]))
+         ExecuteAddon(i);
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Доливка в существующую корзину.                                  |
+//|                                                                  |
+//| Лот берётся ТОТ ЖЕ, что у первой позиции: плоский набор, без      |
+//| мартингейла. Решение принято на уровне проекта — множитель лота   |
+//| превращает ограниченный риск в неограниченный, и никакой cap по   |
+//| глубине этого не компенсирует.                                    |
+//+------------------------------------------------------------------+
+void ExecuteAddon(const int i)
+{
+   BasketState st = g_baskets[i];
+   if(st.positions <= 0 || st.total_volume <= 0.0) return;
+
+   double lot = st.total_volume / (double)st.positions;   // плоский лот корзины
+   double sl_distance = st.atr_at_entry * SL_ATR_Mult;
+   if(sl_distance <= 0.0) return;
+
+   //--- доливка тоже обязана уложиться в бюджет: корзина могла быть
+   //    открыта, когда свободных денег было больше
+   if(EnableRiskBudget)
+   {
+      double rt = 0.0, rs = 0.0;
+      CalcOpenRisk(g_symbol, MagicBase, rt, rs);
+      double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+      if(rt >= equity * MaxPortfolioRiskPct / 100.0 ||
+         rs >= equity * MaxSymbolRiskPct    / 100.0)
+      {
+         if(LogSkips)
+            JournalWrite(g_symbol, "SKIP", TacticName(st.tactic),
+                         "\"stage\":\"addon\",\"reason\":\"risk_budget\"");
+         return;
+      }
+   }
+
+   string tag = OrderTag(st.tactic, true, st.addons_done + 1);
+   ExecResult r = OpenPositionAt(g_trade, g_symbol, st.direction, st.magic,
+                                 lot, sl_distance, tag);
+
+   if(r.ok)
+   {
+      g_baskets[i].addons_done++;
+      g_last_action = "ADDON " + TacticName(st.tactic);
+      JournalWrite(g_symbol, "ADDON", TacticName(st.tactic),
+                   StringFormat("\"n\":%d,\"price\":%.5f,\"sl\":%.5f,\"lot\":%.2f",
+                                g_baskets[i].addons_done, r.price, r.sl, r.lot));
+      //--- цель пересчитается на следующем проходе RecalcBasket
+   }
+   else
+   {
+      JournalWrite(g_symbol, "ADDON_FAIL", TacticName(st.tactic),
+                   StringFormat("\"error\":\"%s\"", r.error));
    }
 }
 
@@ -225,9 +311,8 @@ void LookForEntries()
    if(!g_perm.trading_enabled) return;
    if(!InTradeWindow()) return;
 
-   BarContext ctx;
-   if(!BuildBarContext(g_symbol, g_ind, ctx)) return;
-   if(ATRAnomaly(ctx)) return;
+   if(!ctx_ok) return;
+   if(ATRAnomaly(g_ctx)) return;
 
    for(int i = 0; i < TACTIC_COUNT; i++)
    {
@@ -238,11 +323,110 @@ void LookForEntries()
       if(TimeCurrent() < g_cooldown_until[i]) continue;
 
       Signal sig;
-      if(!EvalTactic(t, ctx, g_ind, sig)) continue;
+      if(!EvalTactic(t, g_ctx, g_ind, sig)) continue;
       if(!sig.valid) continue;
 
-      // арбитраж, расчёт лота и исполнение — Ф1.5 и Ф3
+      //--- направление может быть запрещено параметром или управляющим
+      if(sig.direction == DIR_LONG  && !AllowBuy)  continue;
+      if(sig.direction == DIR_SHORT && !AllowSell) continue;
+      if(g_perm.allowed_direction != DIR_NONE &&
+         sig.direction != g_perm.allowed_direction) continue;
+
+      OpenNewBasket(i, sig);
    }
+}
+
+//+------------------------------------------------------------------+
+//| Открытие новой корзины по сигналу тактики.                       |
+//|                                                                  |
+//| Здесь сходятся все слои: тактика дала расстояние до стопа, бюджет |
+//| превратил его в лот, исполнение отправило приказ. Тактика при     |
+//| этом по-прежнему не знает ни про лот, ни про бюджет — граница     |
+//| держится.                                                        |
+//+------------------------------------------------------------------+
+void OpenNewBasket(const int i, const Signal &sig)
+{
+   string tname = TacticName(sig.tactic);
+
+   double sl_distance = sig.sl_distance;
+   if(sl_distance <= 0.0) sl_distance = g_ctx.atr * SL_ATR_Mult;
+   if(sl_distance <= 0.0) return;
+
+   //--- лот из остатка бюджета, на ПОЛНУЮ глубину корзины
+   double lot = 0.0;
+   if(EnableRiskBudget)
+   {
+      double rt = 0.0, rs = 0.0;
+      CalcOpenRisk(g_symbol, MagicBase, rt, rs);
+      string why = "";
+      lot = CalcBasketLot(g_symbol, sl_distance, PlannedBasketPositions(),
+                          AccountInfoDouble(ACCOUNT_EQUITY), rt, rs, why);
+      if(lot <= 0.0)
+      {
+         if(LogSkips)
+            JournalWrite(g_symbol, "SKIP", tname,
+                         StringFormat("\"stage\":\"entry\",\"reason\":\"%s\"", why));
+         return;
+      }
+   }
+   else
+   {
+      //--- бюджет выключен: одиночный исследовательский прогон.
+      //    Минимальный лот, чтобы результат мерился в R, а не в деньгах.
+      lot = SymbolInfoDouble(g_symbol, SYMBOL_VOLUME_MIN);
+   }
+
+   //--- множитель управляющего только СУЖАЕТ
+   if(g_perm.risk_multiplier > 0.0 && g_perm.risk_multiplier < 1.0)
+      lot *= g_perm.risk_multiplier;
+
+   ExecResult r = OpenPositionAt(g_trade, g_symbol, sig.direction, TacticMagic(sig.tactic),
+                                 lot, sl_distance, OrderTag(sig.tactic, false, 0));
+
+   if(r.ok)
+   {
+      //--- ATR фиксируется на входе: от него считаются и цель, и шаги
+      //    доливок. Плавающий ATR сделал бы уровни непредсказуемыми.
+      g_baskets[i].first_entry  = r.price;
+      g_baskets[i].atr_at_entry = g_ctx.atr;
+      g_baskets[i].direction    = sig.direction;
+      g_baskets[i].addons_done  = 0;
+      g_addons_blocked[i]       = false;
+
+      g_last_action = "OPEN " + tname;
+      JournalWrite(g_symbol, "OPEN", tname,
+                   StringFormat("\"dir\":%d,\"price\":%.5f,\"sl\":%.5f,\"lot\":%.2f,"
+                                "\"atr\":%.5f,\"conf\":%.2f,\"reason\":\"%s\"",
+                                sig.direction, r.price, r.sl, r.lot,
+                                g_ctx.atr, sig.confidence, sig.reason));
+   }
+   else
+   {
+      JournalWrite(g_symbol, "OPEN_FAIL", tname,
+                   StringFormat("\"error\":\"%s\"", r.error));
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Пятничное закрытие. Одна проверка вместо шести параметров Setura. |
+//+------------------------------------------------------------------+
+void CheckFridayClose()
+{
+   if(!CloseAllFriday) return;
+
+   MqlDateTime dt;
+   TimeToStruct(TimeCurrent(), dt);
+   if(dt.day_of_week != 5 || dt.hour < FridayCloseHourUTC) return;
+
+   for(int i = 0; i < TACTIC_COUNT; i++)
+   {
+      if(g_baskets[i].positions <= 0) continue;
+      double pnl = BasketFloatingPnL(g_symbol, g_baskets[i].magic);
+      int n = CloseBasket(g_trade, g_symbol, g_baskets[i].magic);
+      JournalWrite(g_symbol, "FRIDAY_CLOSE", TacticName(g_baskets[i].tactic),
+                   StringFormat("\"closed\":%d,\"pnl\":%.2f", n, pnl));
+   }
+   g_last_action = "FRIDAY_CLOSE";
 }
 
 //+------------------------------------------------------------------+
@@ -256,7 +440,9 @@ void ProcessCycle()
 
    if(IsNewBar())
    {
+      ctx_ok = BuildBarContext(g_symbol, g_ind, g_ctx);
       ReadPermissions(g_perm);
+      CheckFridayClose();
       LookForEntries();
       JournalFlush(g_symbol, false);
    }

@@ -214,3 +214,66 @@ int CloseBasket(CTrade &trade, const string symbol, const int magic)
    }
    return(closed);
 }
+
+//+------------------------------------------------------------------+
+//| Трейлинг по СРЕДНЕЙ цене корзины.                                |
+//|                                                                  |
+//| Перенос идеи из Setura (ManageTrailingStop), но с двумя отличиями.|
+//|                                                                  |
+//| ПЕРВОЕ: считаем от средневзвешенной, а не от каждой позиции по    |
+//| отдельности. У корзины одна экономика — защищать её надо целиком, |
+//| иначе первая позиция уйдёт в безубыток, пока последняя ещё глубоко|
+//| в минусе, и «защищённость» окажется иллюзией.                     |
+//|                                                                  |
+//| ВТОРОЕ: в безубыток входит КОМИССИЯ. Стоп, выставленный ровно на  |
+//| средней цене, закрывает корзину в минус на величину комиссии и    |
+//| спреда — то есть «безубыток», который таковым не является. Это    |
+//| тихая утечка, заметная только на длинной дистанции.               |
+//+------------------------------------------------------------------+
+double BreakevenPrice(const string symbol, const BasketState &st)
+{
+   if(st.positions <= 0 || st.total_volume <= 0.0) return(0.0);
+
+   double tick_value = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
+   double tick_size  = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
+   if(tick_value <= 0.0 || tick_size <= 0.0) return(st.weighted_avg);
+
+   //--- комиссия обеих сторон на весь объём корзины
+   double commission = BrokerCommission * st.total_volume * 2.0;
+   double price_per_money = tick_size / (tick_value * st.total_volume);
+   double offset = commission * price_per_money;
+
+   return((st.direction == DIR_LONG) ? st.weighted_avg + offset
+                                     : st.weighted_avg - offset);
+}
+
+//+------------------------------------------------------------------+
+//| Уровень трейлинга или 0, если трейлить рано.                     |
+//+------------------------------------------------------------------+
+double TrailingStopLevel(const string symbol, const BasketState &st)
+{
+   if(!EnableAvgTrailing || st.positions <= 0) return(0.0);
+   if(st.atr_at_entry <= 0.0) return(0.0);
+
+   double price = (st.direction == DIR_LONG)
+                  ? SymbolInfoDouble(symbol, SYMBOL_BID)
+                  : SymbolInfoDouble(symbol, SYMBOL_ASK);
+   if(price <= 0.0) return(0.0);
+
+   double be = BreakevenPrice(symbol, st);
+   double progress = (st.direction == DIR_LONG) ? (price - be) : (be - price);
+
+   //--- порог запуска отсчитывается от БЕЗУБЫТКА, а не от средней:
+   //    иначе трейлинг стартует, когда корзина ещё в минусе на комиссию
+   if(progress < st.atr_at_entry * TrailStartATR) return(0.0);
+
+   double dist = st.atr_at_entry * TrailDistanceATR;
+   double level = (st.direction == DIR_LONG) ? price - dist : price + dist;
+
+   if(TrailOnlyInProfit)
+   {
+      bool protects = (st.direction == DIR_LONG) ? (level >= be) : (level <= be);
+      if(!protects) return(0.0);
+   }
+   return(level);
+}
