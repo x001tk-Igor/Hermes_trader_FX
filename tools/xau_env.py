@@ -8,7 +8,7 @@ import os
 
 # Terminal (configurable via env)
 EXE = os.environ.get("MT5_TERMINAL_PATH", r"C:\Program Files\RoboForex MT5 Terminal\terminal64.exe")
-HASH = "5FFA568149E88FCD5B44D926DCFEAA79"  # data-dir hash (for reference)
+HASH = "<TERMINAL_DATA_DIR_HASH>"  # data-dir hash (for reference)
 LOGIN = int(os.environ.get("MT5_LOGIN", "0"))  # set via .env
 SERVER = os.environ.get("MT5_SERVER", "RoboForex-Pro")
 

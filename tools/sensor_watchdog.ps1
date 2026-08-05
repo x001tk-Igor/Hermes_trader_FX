@@ -8,7 +8,7 @@
 #
 # Регистрация:
 # schtasks /Create /TN "TradeSensorWatchdog" /SC MINUTE /MO 5 /RL HIGHEST /F ^
-#   /TR "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\x001t\.claude\skills\xau-ai-trader\tools\sensor_watchdog.ps1"
+#   /TR "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\<USER>\.claude\skills\xau-ai-trader\tools\sensor_watchdog.ps1"
 
 $ErrorActionPreference = "Stop"
 

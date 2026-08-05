@@ -1,0 +1,14 @@
+{
+  "trading_enabled": true,
+  "risk_multiplier": 0.4,
+  "allowed_direction": "long",
+  "_meta": {
+    "symbol": "EURUSD",
+    "tactic": "S8_SmartTrend",
+    "reason": "H4+D1 бычий, RSI D1=72 + NFP через 40мин — блок SELL + тормоз лота",
+    "action": "BRAKE_MODERATE",
+    "confidence": 0.82,
+    "issued_utc": "2026-08-05T12:30:00Z",
+    "duration_minutes": 90
+  }
+}

@@ -33,6 +33,7 @@
 #include "Modules/Execute.mqh"
 #include "Modules/Tactics.mqh"
 #include "Modules/Bridge.mqh"
+#include "ontester_template.mqh"   // OnTester-коллектор результатов оптимизации в CSV (mt5-walkforward)
 
 //--- глобальное состояние -------------------------------------------
 CTrade        g_trade;
@@ -442,7 +443,7 @@ void ProcessCycle()
    if(IsNewBar())
    {
       ctx_ok = BuildBarContext(g_symbol, g_ind, g_ctx);
-      ReadPermissions(g_perm);
+      ReadPermissions(g_perm, g_symbol);
       CheckFridayClose();
       LookForEntries();
       JournalFlush(g_symbol, false);

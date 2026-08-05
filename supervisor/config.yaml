@@ -1,0 +1,76 @@
+# Hermes FX AI Supervisor config
+# ЧИТАТЬ ПЕРЕД deploy. Все пути — абсолютные под твой терминал Hermes FX deploy.
+
+bridge:
+  # Папка MQL5\Files\HermesFX терминала, где EA пишет heartbeat_<sym>.json и читает
+  # permissions_<sym>.json. Должна совпадать с BridgeFolder в .set (= "HermesFX")
+  # и DataDir терминала, на котором крутятся 5 чартов Hermes FX.
+  folder: "C:/Users/<USER>/AppData/Roaming/MetaQuotes/Terminal/<TERMINAL_ID_HERMES_FX>/MQL5/Files/HermesFX"
+  # data_path терминала для mt5.initialize(path=...). Должен быть терминал Hermes FX
+  # (НЕ <TERMINAL_ID_XAU> live XAU trader!). None = default (запущенный терминал).
+  mt5_data_path: null
+  state_max_age_sec: 300
+
+agent:
+  agent_id: "hermes-fx-supervisor"
+  symbols:
+    - "EURAUD"
+    - "EURUSD"
+    - "GBPUSD"
+    - "NZDCAD"
+    - "USDCAD"
+  decision_interval_min: 60     # EA читает permissions на каждом H1-баре — 60 мин выровнено
+  command_ttl_min: 75
+
+sonnet:
+  model: "anthropic/claude-sonnet-4-6"
+  max_tokens: 512
+  temperature: 0.0
+  timeout_sec: 45
+  base_url: "https://openrouter.ai/api/v1"
+
+# Confidence-driven escalation: KILL_NEW (самое агрессивное constrictive-действие)
+# с conf<0.85 → переспрос Opus → если Opus не подтвердил, downgrade до BRAKE_HEAVY
+# (не ложимся в полный стоп без подтверждения). Копеечная стоимость, раз в неск. дней.
+opus:
+  model: "anthropic/claude-opus-4-8"
+  max_tokens: 512
+  temperature: 0.0
+  timeout_sec: 60
+  base_url: "https://openrouter.ai/api/v1"
+
+escalation:
+  enabled: true
+  trigger_actions: ["KILL_NEW"]
+  conf_threshold: 0.85
+  downgrade_to: "BRAKE_HEAVY"
+
+news:
+  url: "https://nfs.faireconomy.media/ff_calendar_thisweek.xml"
+  cache_ttl_sec: 3600
+  hours_ahead: 4
+
+market:
+  timeframes: ["H1", "H4", "D1"]
+  atr_period: 14
+  rsi_period: 14
+
+# Safety floor пороги (rules.py). Все в % от equity. Conservative.
+# Hermes portfolio sim показал combined maxDD 3.57% на 2.57yr — пороги с запасом.
+risk_thresholds:
+  drawdown_brake_light_pct: 1.5      # лёгкий тормоз
+  drawdown_brake_moderate_pct: 2.5   # средний
+  drawdown_brake_heavy_pct: 4.0      # тяжёлый
+  drawdown_kill_pct: 6.0             # KILL_NEW (стоп новые входы)
+  grid_count_warning: 6
+  grid_dd_combo_pct: 2.0
+  margin_kill_pct: 200
+
+sessions:
+  london_open_utc: "07:00"
+  ny_open_utc: "12:00"
+  session_open_pause_min: 30
+
+logging:
+  folder: "logs"
+  level: "INFO"

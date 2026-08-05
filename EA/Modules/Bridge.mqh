@@ -66,52 +66,105 @@ string BridgePath(const string name)
 //| главная причина прогонов длиной в часы (см. mt5-env, грабля       |
 //| «бэктест ползёт часами»).                                        |
 //+------------------------------------------------------------------+
-bool ReadPermissions(Permissions &p)
+//+------------------------------------------------------------------+
+//| Применить ОДИН файл разрешений поверх текущего состояния.        |
+//|                                                                  |
+//| Функция умеет только УЖЕСТОЧАТЬ. Это не стилистика, а то, на чём  |
+//| держится вся безопасность моста: два файла (глобальный и по       |
+//| символу) могут противоречить друг другу, и если бы поздний просто |
+//| перезаписывал раннего, порядок чтения решал бы судьбу аварийного  |
+//| стопа. При «побеждает строжайшее» порядок не важен вовсе.         |
+//|                                                                  |
+//| → true, если файл прочитан (не «если что-то запретил»).           |
+//+------------------------------------------------------------------+
+bool ApplyPermissionFile(const string path, Permissions &p)
 {
-   if(!EnableBridge)                     { p.SetPermissive(); return(false); }
-   if(MQLInfoInteger(MQL_TESTER) != 0)   { p.SetPermissive(); return(false); }
-
-   int h = FileOpen(BridgePath("permissions.json"), FILE_READ | FILE_TXT | FILE_ANSI);
-   if(h == INVALID_HANDLE)               { p.SetPermissive(); return(false); }
+   int h = FileOpen(path, FILE_READ | FILE_TXT | FILE_ANSI);
+   if(h == INVALID_HANDLE) return(false);
 
    string body = "";
    while(!FileIsEnding(h)) body += FileReadString(h);
    FileClose(h);
+   if(StringLen(body) < 2) return(false);
 
-   if(StringLen(body) < 2)               { p.SetPermissive(); return(false); }
-
-   p.SetPermissive();
-   p.loaded  = true;
-   p.read_at = TimeCurrent();
-
+   //--- запрет торговли: false ПОБЕЖДАЕТ всегда
    if(StringFind(body, "\"trading_enabled\": false") >= 0 ||
       StringFind(body, "\"trading_enabled\":false")  >= 0)
       p.trading_enabled = false;
 
-   //--- множитель риска: только СУЖАЕТ, значения > 1 игнорируются
+   //--- множитель риска: берём МЕНЬШИЙ. Значения >= 1.0 игнорируются —
+   //    разрешение не имеет права поднимать риск, только опускать.
    int pos = StringFind(body, "\"risk_multiplier\"");
    if(pos >= 0)
    {
       int colon = StringFind(body, ":", pos);
       if(colon > 0)
       {
-         string tail = StringSubstr(body, colon + 1, 12);
-         double v = StringToDouble(tail);
-         if(v > 0.0 && v < 1.0) p.risk_multiplier = v;
+         double v = StringToDouble(StringSubstr(body, colon + 1, 12));
+         if(v > 0.0 && v < 1.0 && v < p.risk_multiplier) p.risk_multiplier = v;
       }
    }
 
-   //--- запрет отдельных тактик по имени
+   //--- отключение отдельных тактик: снятый флаг обратно не поднимается
    for(int i = 0; i < TACTIC_COUNT; i++)
    {
       string marker = "\"" + TacticName(TacticByIndex(i)) + "\": false";
       if(StringFind(body, marker) >= 0) p.tactic_enabled[i] = false;
    }
 
-   if(StringFind(body, "\"allowed_direction\": \"long\"")  >= 0) p.allowed_direction = DIR_LONG;
-   if(StringFind(body, "\"allowed_direction\": \"short\"") >= 0) p.allowed_direction = DIR_SHORT;
+   //--- направление. Если один файл разрешает только лонг, а другой
+   //    только шорт, разрешённого направления не остаётся вовсе —
+   //    и это НЕ повод выбрать одно из двух. Строжайшее прочтение
+   //    противоречия: новых входов нет.
+   int want = DIR_NONE;
+   if(StringFind(body, "\"allowed_direction\": \"long\"")  >= 0) want = DIR_LONG;
+   if(StringFind(body, "\"allowed_direction\": \"short\"") >= 0) want = DIR_SHORT;
+
+   if(want != DIR_NONE)
+   {
+      if(p.allowed_direction == DIR_NONE)
+         p.allowed_direction = want;
+      else if(p.allowed_direction != want)
+      {
+         //--- «только лонг» и «только шорт» одновременно означают, что
+         //    разрешённого направления не осталось. Оставить первое
+         //    прочитанное значило бы, что итог зависит от порядка чтения
+         //    файлов — ровно от того, что эта правка и устраняет.
+         p.allowed_direction = DIR_NONE;
+         p.trading_enabled   = false;
+      }
+   }
 
    return(true);
+}
+
+//+------------------------------------------------------------------+
+//| Чтение разрешений: глобальные И по символу, строжайшее побеждает. |
+//|                                                                  |
+//| РЕГРЕСС, найденный аудитом 2026-08-05. Раньше файлы читались по   |
+//| принципу «сначала по символу, если нет — глобальный». Это делало  |
+//| аварийный стоп неработоспособным: управляющий переписывает        |
+//| персональные файлы каждый цикл, и глобальный `permissions.json`   |
+//| с `trading_enabled: false` оказывался перекрыт персональным ALLOW |
+//| на следующем же круге. Стоп существовал и не останавливал.        |
+//|                                                                  |
+//| Теперь читаются ОБА и объединяются по правилу «побеждает то, что  |
+//| строже». Порядок чтения перестал иметь значение, а это ровно то   |
+//| свойство, которого не хватало.                                    |
+//+------------------------------------------------------------------+
+bool ReadPermissions(Permissions &p, const string symbol)
+{
+   p.SetPermissive();
+
+   if(!EnableBridge)                     return(false);
+   if(MQLInfoInteger(MQL_TESTER) != 0)   return(false);
+
+   bool got_global = ApplyPermissionFile(BridgePath("permissions.json"), p);
+   bool got_symbol = ApplyPermissionFile(BridgePath("permissions_" + symbol + ".json"), p);
+
+   p.loaded  = (got_global || got_symbol);
+   p.read_at = TimeCurrent();
+   return(p.loaded);
 }
 
 //+------------------------------------------------------------------+
